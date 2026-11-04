@@ -1,0 +1,1019 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'screens/products_screen.dart';
+import 'screens/sales_screen.dart';
+import 'screens/finance_screen.dart';
+import 'screens/cloud_sync_screen.dart';
+import 'services/supabase_config.dart';
+import 'widgets/app_control_gate.dart';
+
+const _navy = Color(0xFF24352F);
+const _blue = Color(0xFF3D6555);
+const _canvas = Color(0xFFF4F1E8);
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: supabaseProjectUrl,
+    publishableKey: supabasePublishableKey,
+  );
+  runApp(const ElectricalShopApp());
+}
+
+class ElectricalShopApp extends StatelessWidget {
+  const ElectricalShopApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: _blue,
+      brightness: Brightness.light,
+      surface: const Color(0xFFFFFEFA),
+    );
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'NanaKay Electrical Shop',
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: scheme,
+        scaffoldBackgroundColor: _canvas,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: _canvas,
+          foregroundColor: _navy,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+        ),
+        cardTheme: CardThemeData(
+          color: const Color(0xFFFFFEFA),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0xFFE3DED2)),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFFFFFEFA),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFFDDD8CC)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFFDDD8CC)),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: _blue,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          ),
+        ),
+      ),
+      home: const OwnerAccessGate(),
+    );
+  }
+}
+
+class OwnerAccessGate extends StatefulWidget {
+  const OwnerAccessGate({super.key, this.readPin, this.writePin});
+
+  final Future<String?> Function()? readPin;
+  final Future<void> Function(String pin)? writePin;
+
+  @override
+  State<OwnerAccessGate> createState() => _OwnerAccessGateState();
+}
+
+class _OwnerAccessGateState extends State<OwnerAccessGate>
+    with WidgetsBindingObserver {
+  static const _pinKey = 'electrical_shop_owner_pin_v1';
+  static const _secureStorage = FlutterSecureStorage();
+  final _pinController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _loading = true;
+  bool _setupRequired = true;
+  bool _unlocked = false;
+  bool _saving = false;
+  String? _error;
+  Timer? _idleTimer;
+  DateTime? _lastActivityAt;
+  static const _idleTimeout = Duration(minutes: 2);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointerEvent);
+    _loadAccess();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_onPointerEvent);
+    _idleTimer?.cancel();
+    _pinController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final pin =
+          await (widget.readPin?.call() ?? _secureStorage.read(key: _pinKey));
+      if (mounted) {
+        setState(() {
+          _setupRequired = pin == null;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _setupRequired = true;
+          _loading = false;
+          _error = 'Secure storage is unavailable on this device.';
+        });
+      }
+    }
+  }
+
+  Future<void> _submit() async {
+    final pin = _pinController.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      setState(() => _error = 'Enter a 6-digit PIN.');
+      return;
+    }
+    if (_setupRequired && pin != _confirmController.text.trim()) {
+      setState(() => _error = 'The PINs do not match.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      if (_setupRequired) {
+        if (widget.writePin != null) {
+          await widget.writePin!(pin);
+        } else {
+          await _secureStorage.write(key: _pinKey, value: pin);
+        }
+      } else {
+        final savedPin =
+            await (widget.readPin?.call() ?? _secureStorage.read(key: _pinKey));
+        if (savedPin != pin) {
+          throw const FormatException('Incorrect PIN. Try again.');
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _unlocked = true;
+          _saving = false;
+        });
+        _recordActivity();
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error is FormatException
+              ? error.message
+              : 'Could not save or verify the owner PIN.';
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  void _onPointerEvent(PointerEvent event) {
+    if (event is PointerDownEvent || event is PointerMoveEvent) {
+      _recordActivity();
+    }
+  }
+
+  void _recordActivity() {
+    if (!_unlocked) return;
+    _lastActivityAt = DateTime.now();
+    _scheduleIdleLock(_idleTimeout);
+  }
+
+  void _scheduleIdleLock(Duration delay) {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(delay, _lockForInactivity);
+  }
+
+  void _lockForInactivity() {
+    if (!mounted || !_unlocked) return;
+    setState(() {
+      _unlocked = false;
+      _pinController.clear();
+      _confirmController.clear();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_unlocked) return;
+    final lastActivity = _lastActivityAt;
+    if (lastActivity == null) {
+      _recordActivity();
+      return;
+    }
+    final remaining = _idleTimeout - DateTime.now().difference(lastActivity);
+    if (remaining <= Duration.zero) {
+      _lockForInactivity();
+    } else {
+      _scheduleIdleLock(remaining);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_unlocked) {
+      return Focus(
+        onKeyEvent: (_, _) {
+          _recordActivity();
+          return KeyEventResult.ignored;
+        },
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => _recordActivity(),
+          onPointerMove: (_) => _recordActivity(),
+          onPointerSignal: (_) => _recordActivity(),
+          child: const AppControlGate(child: ShopDashboard()),
+        ),
+      );
+    }
+    return Scaffold(
+      bottomNavigationBar: const _DeveloperCredit(dark: true),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(color: Color(0xFF24352F)),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Image.asset('assets/brand/nanakay_mark_light.png'),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'NANAKAY',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'ELECTRICAL SHOP',
+                    style: TextStyle(
+                      color: Color(0xFFD7E1D9),
+                      fontSize: 11,
+                      letterSpacing: 2.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            _setupRequired
+                                ? 'Set up owner access'
+                                : 'Welcome back',
+                            style: const TextStyle(
+                              color: _navy,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _setupRequired
+                                ? 'Create a 6-digit PIN to protect this shop.'
+                                : 'Enter your owner PIN to continue.',
+                            style: const TextStyle(color: Color(0xFF68736D)),
+                          ),
+                          const SizedBox(height: 20),
+                          TextField(
+                            controller: _pinController,
+                            obscureText: true,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            decoration: const InputDecoration(
+                              labelText: '6-digit PIN',
+                              prefixIcon: Icon(Icons.lock_outline),
+                              counterText: '',
+                            ),
+                          ),
+                          if (_setupRequired) ...[
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _confirmController,
+                              obscureText: true,
+                              keyboardType: TextInputType.number,
+                              maxLength: 6,
+                              decoration: const InputDecoration(
+                                labelText: 'Confirm PIN',
+                                prefixIcon: Icon(Icons.verified_user_outlined),
+                                counterText: '',
+                              ),
+                            ),
+                          ],
+                          if (_error != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              _error!,
+                              style: const TextStyle(color: Color(0xFFB42318)),
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+                          FilledButton(
+                            onPressed: _saving ? null : _submit,
+                            child: Text(
+                              _saving
+                                  ? 'Please wait…'
+                                  : _setupRequired
+                                  ? 'Create PIN and continue'
+                                  : 'Unlock shop',
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Your PIN is stored securely on this device. Keep it somewhere safe; there is no online password reset configured.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF68736D),
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ShopDashboard extends StatefulWidget {
+  const ShopDashboard({super.key});
+
+  @override
+  State<ShopDashboard> createState() => _ShopDashboardState();
+}
+
+class _ShopDashboardState extends State<ShopDashboard> {
+  int _selectedIndex = 0;
+
+  void _selectPage(int index) => setState(() => _selectedIndex = index);
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = <Widget>[
+      _OverviewScreen(onOpenProducts: () => _selectPage(1)),
+      const ProductsScreen(),
+      const SalesScreen(),
+      const FinanceScreen(),
+      const CloudSyncScreen(),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 760;
+        return Scaffold(
+          body: SafeArea(
+            child: Row(
+              children: [
+                if (wide)
+                  NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _selectPage,
+                    labelType: NavigationRailLabelType.all,
+                    backgroundColor: const Color(0xFFFFFEFA),
+                    leading: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: _BrandMark(compact: true),
+                    ),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.space_dashboard_outlined),
+                        selectedIcon: Icon(Icons.space_dashboard_rounded),
+                        label: Text('Overview'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.inventory_2_outlined),
+                        selectedIcon: Icon(Icons.inventory_2_rounded),
+                        label: Text('Products'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.point_of_sale_outlined),
+                        selectedIcon: Icon(Icons.point_of_sale_rounded),
+                        label: Text('Sales'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.account_balance_wallet_outlined),
+                        selectedIcon: Icon(Icons.account_balance_wallet),
+                        label: Text('Finances'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.cloud_sync_outlined),
+                        selectedIcon: Icon(Icons.cloud_sync_rounded),
+                        label: Text('Sync'),
+                      ),
+                    ],
+                  ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: IndexedStack(
+                          index: _selectedIndex,
+                          children: pages,
+                        ),
+                      ),
+                      const _DeveloperCredit(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          bottomNavigationBar: wide
+              ? null
+              : NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _selectPage,
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.space_dashboard_outlined),
+                      selectedIcon: Icon(Icons.space_dashboard_rounded),
+                      label: 'Overview',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.inventory_2_outlined),
+                      selectedIcon: Icon(Icons.inventory_2_rounded),
+                      label: 'Products',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.point_of_sale_outlined),
+                      selectedIcon: Icon(Icons.point_of_sale_rounded),
+                      label: 'Sales',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.account_balance_wallet_outlined),
+                      selectedIcon: Icon(Icons.account_balance_wallet),
+                      label: 'Finances',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.cloud_sync_outlined),
+                      selectedIcon: Icon(Icons.cloud_sync_rounded),
+                      label: 'Sync',
+                    ),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _DeveloperCredit extends StatelessWidget {
+  const _DeveloperCredit({this.dark = false});
+
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 34,
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: dark ? _navy : const Color(0xFFFFFEFA),
+      border: Border(
+        top: BorderSide(
+          color: dark ? const Color(0xFF40514A) : const Color(0xFFE3DED2),
+        ),
+      ),
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.bolt_rounded, size: 13, color: Color(0xFFB67C3D)),
+        const SizedBox(width: 5),
+        Text(
+          '© Developed by Genesis Tech',
+          style: TextStyle(
+            color: dark ? const Color(0xFFD7E1D9) : const Color(0xFF68736D),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _OverviewScreen extends StatefulWidget {
+  const _OverviewScreen({required this.onOpenProducts});
+
+  final VoidCallback onOpenProducts;
+
+  @override
+  State<_OverviewScreen> createState() => _OverviewScreenState();
+}
+
+class _OverviewScreenState extends State<_OverviewScreen> {
+  static const _productsKey = 'electrical_shop_products_v1';
+  static const _salesKey = 'electrical_shop_sales_v1';
+  List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _sales = [];
+
+  @override
+  void initState() {
+    super.initState();
+    productStockChanged.addListener(_loadOverview);
+    _loadOverview();
+  }
+
+  @override
+  void dispose() {
+    productStockChanged.removeListener(_loadOverview);
+    super.dispose();
+  }
+
+  Future<void> _loadOverview() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final productData = prefs.getString(_productsKey);
+      final salesData = prefs.getString(_salesKey);
+      final products = productData == null
+          ? <Map<String, dynamic>>[]
+          : (jsonDecode(productData) as List)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+      final sales = salesData == null
+          ? <Map<String, dynamic>>[]
+          : (jsonDecode(salesData) as List)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _sales = sales;
+        });
+      }
+    } catch (_) {
+      // Keep the last successfully loaded overview visible if saved data is invalid.
+    }
+  }
+
+  String _money(double value) => 'GHS ${value.toStringAsFixed(2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final lowStock = _products
+        .where(
+          (p) =>
+              (p['quantity'] as num? ?? 0) <= (p['lowStockLimit'] as num? ?? 0),
+        )
+        .toList();
+    final units = _products.fold<int>(
+      0,
+      (sum, p) => sum + ((p['quantity'] as num?)?.toInt() ?? 0),
+    );
+    final now = DateTime.now();
+    final todaysSales = _sales.where((s) {
+      final date = DateTime.tryParse(s['date'] as String? ?? '')?.toLocal();
+      return date != null &&
+          date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
+    }).toList();
+    final salesTotal = todaysSales.fold<double>(
+      0,
+      (sum, s) => sum + ((s['total'] as num?)?.toDouble() ?? 0),
+    );
+    final profit = todaysSales.fold<double>(0, (sum, s) {
+      final items = s['items'] as List<dynamic>? ?? const [];
+      return sum +
+          items.fold<double>(0, (itemSum, raw) {
+            final item = Map<String, dynamic>.from(raw as Map);
+            final savedCost = item['unitCost'];
+            if (savedCost is! num) return itemSum;
+            final cost = savedCost.toDouble();
+            final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
+            final price = (item['unitPrice'] as num?)?.toDouble() ?? 0;
+            return itemSum + (price - cost) * quantity;
+          });
+    });
+    return Scaffold(
+      appBar: AppBar(
+        title: const _BrandMark(),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 18),
+            child: CircleAvatar(
+              backgroundColor: const Color(0xFFE7EEE8),
+              foregroundColor: _blue,
+              child: Image.asset(
+                'assets/brand/nanakay_mark_dark.png',
+                width: 25,
+                height: 25,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 32),
+        children: [
+          Text(
+            'Shop overview',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: _navy,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'A clear view of your electrical shop.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: const Color(0xFF68736D)),
+          ),
+          const SizedBox(height: 24),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth > 850
+                  ? 4
+                  : constraints.maxWidth > 500
+                  ? 2
+                  : 1;
+              const gap = 14.0;
+              final width =
+                  (constraints.maxWidth - gap * (columns - 1)) / columns;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  SizedBox(
+                    width: width,
+                    child: _MetricCard(
+                      label: "Today's sales",
+                      value: _money(salesTotal),
+                      helper: '${todaysSales.length} recorded sales today',
+                      icon: Icons.payments_outlined,
+                      tint: Color(0xFFE7EEE8),
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _MetricCard(
+                      label: 'Estimated profit',
+                      value: _money(profit),
+                      helper: 'Recorded where a sale has saved cost data',
+                      icon: Icons.trending_up_rounded,
+                      tint: Color(0xFFE7EEE8),
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _MetricCard(
+                      label: 'Units in stock',
+                      value: '$units',
+                      helper: '${_products.length} product types',
+                      icon: Icons.inventory_2_outlined,
+                      tint: Color(0xFFFFF3DF),
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _MetricCard(
+                      label: 'Low-stock products',
+                      value: '${lowStock.length}',
+                      helper: lowStock.isEmpty
+                          ? 'All products above limits'
+                          : 'Needs a stock check',
+                      icon: Icons.warning_amber_rounded,
+                      tint: Color(0xFFFFEAEA),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          if (lowStock.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Card(
+              color: const Color(0xFFFFF6E8),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Color(0xFFB54708),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${lowStock.length} low-stock ${lowStock.length == 1 ? 'product' : 'products'}',
+                            style: const TextStyle(
+                              color: Color(0xFF7A2E0E),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: widget.onOpenProducts,
+                          child: const Text('Review stock'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      lowStock
+                          .take(5)
+                          .map(
+                            (p) =>
+                                '${p['name']}: ${p['quantity']} left (limit ${p['lowStockLimit']})',
+                          )
+                          .join('  ·  '),
+                      style: const TextStyle(color: Color(0xFF7A2E0E)),
+                    ),
+                    if (lowStock.length > 5)
+                      Text(
+                        'and ${lowStock.length - 5} more',
+                        style: const TextStyle(color: Color(0xFF7A2E0E)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Get started',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: _navy,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final stacked = constraints.maxWidth < 480;
+                  final copy = const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Keep your inventory up to date',
+                        style: TextStyle(
+                          color: _navy,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Add products, update prices and check stock levels.',
+                        style: TextStyle(color: Color(0xFF68736D)),
+                      ),
+                    ],
+                  );
+                  final button = FilledButton.icon(
+                    onPressed: widget.onOpenProducts,
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: const Text('Open products'),
+                  );
+                  if (stacked) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [copy, const SizedBox(height: 16), button],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: copy),
+                      const SizedBox(width: 16),
+                      button,
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _InfoNote(
+            icon: Icons.info_outline_rounded,
+            text:
+                'Sales, inventory counts and low-stock alerts update from saved shop records.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: _navy,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Image.asset('assets/brand/nanakay_mark_light.png'),
+          ),
+        ),
+        if (!compact) ...[
+          const SizedBox(width: 11),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'NanaKay Electrical Shop',
+                style: TextStyle(
+                  color: _navy,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                'ELECTRICAL SHOP',
+                style: TextStyle(
+                  color: Color(0xFF727C73),
+                  fontSize: 10,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.helper,
+    required this.icon,
+    required this.tint,
+  });
+
+  final String label;
+  final String value;
+  final String helper;
+  final IconData icon;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Color(0xFF68736D),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, size: 19, color: _navy),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              value,
+              style: const TextStyle(
+                color: _navy,
+                fontSize: 25,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              helper,
+              style: const TextStyle(color: Color(0xFF80887F), fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoNote extends StatelessWidget {
+  const _InfoNote({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.info_outline_rounded,
+          size: 17,
+          color: Color(0xFF68736D),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: Color(0xFF68736D), fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}

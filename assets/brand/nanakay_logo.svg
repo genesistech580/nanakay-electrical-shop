@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1540" height="400" viewBox="0 0 1540 400">
+  <g transform="translate(22 20) scale(.3515625)">
+    <path fill="#24352F" d="M512 96c198 0 330 152 308 324-12 100-100 152-152 220l-48 60v42H404v-42l-48-60c-52-68-140-120-152-220C182 248 314 96 512 96z"/>
+    <g fill="none" stroke="#D5A25F" stroke-width="34" stroke-linecap="round"><path d="M512 18v44M260 116l40 40m464-40-40 40M148 352h54m674 0h-54M414 516l98-108 98 108H414z"/></g>
+    <g fill="none" stroke="#24352F" stroke-width="34" stroke-linecap="round"><path d="M414 786h196m-178 50h160m-136 50h112"/></g>
+  </g>
+  <text x="426" y="158" fill="#24352F" font-family="Segoe UI, Arial, sans-serif" font-size="98" font-weight="700" letter-spacing="4">NANAKAY</text>
+  <text x="432" y="232" fill="#D5A25F" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="700" letter-spacing="1.5">ELECTRICAL SHOP</text>
+  <text x="435" y="302" fill="#78847B" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="1">STOCK · SALES · FINANCE</text>
+</svg>
