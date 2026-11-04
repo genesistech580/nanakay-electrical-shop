@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,6 +11,7 @@ import 'screens/sales_screen.dart';
 import 'screens/finance_screen.dart';
 import 'screens/cloud_sync_screen.dart';
 import 'services/supabase_config.dart';
+import 'services/shop_security_service.dart';
 import 'widgets/app_control_gate.dart';
 
 const _navy = Color(0xFF24352F);
@@ -99,14 +99,13 @@ class OwnerAccessGate extends StatefulWidget {
 
 class _OwnerAccessGateState extends State<OwnerAccessGate>
     with WidgetsBindingObserver {
-  static const _pinKey = 'electrical_shop_owner_pin_v1';
-  static const _secureStorage = FlutterSecureStorage();
   final _pinController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _loading = true;
   bool _setupRequired = true;
   bool _unlocked = false;
   bool _saving = false;
+  bool _obscurePassword = true;
   String? _error;
   Timer? _idleTimer;
   DateTime? _lastActivityAt;
@@ -132,11 +131,21 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
 
   Future<void> _loadAccess() async {
     try {
-      final pin =
-          await (widget.readPin?.call() ?? _secureStorage.read(key: _pinKey));
+      if (widget.readPin != null) {
+        final pin = await widget.readPin!();
+        if (mounted) {
+          setState(() {
+            _setupRequired = pin == null;
+            _loading = false;
+          });
+        }
+        return;
+      }
+
+      final needed = await ShopSecurityService.instance.isSetupRequired();
       if (mounted) {
         setState(() {
-          _setupRequired = pin == null;
+          _setupRequired = needed;
           _loading = false;
         });
       }
@@ -145,7 +154,6 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
         setState(() {
           _setupRequired = true;
           _loading = false;
-          _error = 'Secure storage is unavailable on this device.';
         });
       }
     }
@@ -153,12 +161,12 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
 
   Future<void> _submit() async {
     final pin = _pinController.text.trim();
-    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
-      setState(() => _error = 'Enter a 6-digit PIN.');
+    if (pin.length < 4) {
+      setState(() => _error = 'Enter at least 4 characters for your password / PIN.');
       return;
     }
     if (_setupRequired && pin != _confirmController.text.trim()) {
-      setState(() => _error = 'The PINs do not match.');
+      setState(() => _error = 'The passwords do not match.');
       return;
     }
     setState(() {
@@ -170,13 +178,18 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
         if (widget.writePin != null) {
           await widget.writePin!(pin);
         } else {
-          await _secureStorage.write(key: _pinKey, value: pin);
+          await ShopSecurityService.instance.savePassword(pin);
         }
       } else {
-        final savedPin =
-            await (widget.readPin?.call() ?? _secureStorage.read(key: _pinKey));
-        if (savedPin != pin) {
-          throw const FormatException('Incorrect PIN. Try again.');
+        bool isValid = false;
+        if (widget.readPin != null) {
+          final savedPin = await widget.readPin!();
+          isValid = savedPin == pin;
+        } else {
+          isValid = await ShopSecurityService.instance.verifyPassword(pin);
+        }
+        if (!isValid) {
+          throw const FormatException('Incorrect password / PIN. Try again.');
         }
       }
       if (mounted) {
@@ -191,7 +204,7 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
         setState(() {
           _error = error is FormatException
               ? error.message
-              : 'Could not save or verify the owner PIN.';
+              : 'Could not save or verify the owner password.';
           _saving = false;
         });
       }
@@ -324,33 +337,39 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
                           const SizedBox(height: 6),
                           Text(
                             _setupRequired
-                                ? 'Create a 6-digit PIN to protect this shop.'
-                                : 'Enter your owner PIN to continue.',
+                                ? 'Create a secure password or PIN to protect this shop.'
+                                : 'Enter your owner password or PIN to continue.',
                             style: const TextStyle(color: Color(0xFF68736D)),
                           ),
                           const SizedBox(height: 20),
                           TextField(
                             controller: _pinController,
-                            obscureText: true,
-                            keyboardType: TextInputType.number,
-                            maxLength: 6,
-                            decoration: const InputDecoration(
-                              labelText: '6-digit PIN',
-                              prefixIcon: Icon(Icons.lock_outline),
-                              counterText: '',
+                            obscureText: _obscurePassword,
+                            keyboardType: TextInputType.visiblePassword,
+                            decoration: InputDecoration(
+                              labelText: 'Password / PIN',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
+                              ),
                             ),
                           ),
                           if (_setupRequired) ...[
                             const SizedBox(height: 12),
                             TextField(
                               controller: _confirmController,
-                              obscureText: true,
-                              keyboardType: TextInputType.number,
-                              maxLength: 6,
+                              obscureText: _obscurePassword,
+                              keyboardType: TextInputType.visiblePassword,
                               decoration: const InputDecoration(
-                                labelText: 'Confirm PIN',
+                                labelText: 'Confirm Password / PIN',
                                 prefixIcon: Icon(Icons.verified_user_outlined),
-                                counterText: '',
                               ),
                             ),
                           ],
@@ -374,7 +393,7 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
                           ),
                           const SizedBox(height: 14),
                           const Text(
-                            'Your PIN is stored securely on this device. Keep it somewhere safe; there is no online password reset configured.',
+                            'Your password is saved securely in your database and encrypted on this device.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Color(0xFF68736D),
