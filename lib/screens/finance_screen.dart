@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'products_screen.dart';
 import '../widgets/pdf_document_preview_screen.dart';
+import '../services/backup_validation.dart';
+import '../services/shop_storage.dart';
 
 const _salesKey = 'electrical_shop_sales_v1';
 const _expensesKey = 'electrical_shop_expenses_v1';
@@ -110,7 +112,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
   );
   double get _expenseTotal =>
       _expenses.fold(0, (sum, expense) => sum + _value(expense, 'amount'));
-  double get _netProfit => _profitRevenue - _costOfGoods - _expenseTotal;
+  // Inventory purchases become a profit cost when the items are sold (COGS).
+  // Keep the purchase in the expense ledger without deducting it twice.
+  double get _operatingExpenseTotal => _expenses
+      .where((expense) => expense['category'] != 'Stock Purchase')
+      .fold(0, (sum, expense) => sum + _value(expense, 'amount'));
+  double get _netProfit =>
+      _profitRevenue - _costOfGoods - _operatingExpenseTotal;
   double get _creditTotal =>
       _sales.fold(0, (sum, sale) => sum + _balance(sale));
 
@@ -151,6 +159,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
       0,
       (sum, expense) => sum + _value(expense, 'amount'),
     );
+    final operatingExpenses = expenses
+        .where((expense) => expense['category'] != 'Stock Purchase')
+        .fold<double>(0, (sum, expense) => sum + _value(expense, 'amount'));
     return {
       'salesCount': sales.length,
       'revenue': sales.fold<double>(
@@ -159,7 +170,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       ),
       'grossProfit': grossProfit,
       'expenses': expenseTotal,
-      'netProfit': grossProfit - expenseTotal,
+      'netProfit': grossProfit - operatingExpenses,
     };
   }
 
@@ -169,7 +180,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }) async {
     final controller = TextEditingController();
     String? error;
-    final result = await showDialog<double>(
+    final route = DialogRoute<double>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
@@ -227,6 +238,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
         ),
       ),
     );
+    final result = await Navigator.of(context, rootNavigator: true).push(route);
+    await route.completed;
     controller.dispose();
     return result;
   }
@@ -243,23 +256,34 @@ class _FinanceScreenState extends State<FinanceScreen> {
       title: 'Record repayment from $customer',
       maximum: due,
     );
-    if (amount == null || !mounted) return;
+    if (amount == null || !mounted || _busy) return;
     setState(() => _busy = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final oldSales = prefs.getString(_salesKey);
+      final currentSales = _decodeList(oldSales);
+      final currentCustomerSales = currentSales
+          .where((sale) => _customer(sale) == customer && _balance(sale) > 0)
+          .toList();
+      final currentDue = currentCustomerSales.fold<double>(
+        0,
+        (sum, sale) => sum + _balance(sale),
+      );
+      if (amount > currentDue) {
+        throw StateError(
+          'The credit balance changed. Review it and try again.',
+        );
+      }
       var remaining = amount;
       // Apply payments to older sales first so each balance can be audited.
-      for (final sale in customerSales.reversed) {
+      for (final sale in currentCustomerSales.reversed) {
         final outstanding = _balance(sale);
         final applied = remaining < outstanding ? remaining : outstanding;
         sale['outstanding'] = outstanding - applied;
         remaining -= applied;
         if (remaining <= 0) break;
       }
-      final repayments = _repayments
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
+      final repayments = _decodeList(prefs.getString(_repaymentsKey));
       repayments.insert(0, {
         'id': DateTime.now().microsecondsSinceEpoch.toString(),
         'customer': customer,
@@ -270,15 +294,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
         'date': DateTime.now().toIso8601String(),
         'saleIds': customerSales.map((s) => s['id']).toList(),
       });
-      if (!await prefs.setString(_salesKey, jsonEncode(_sales))) {
-        throw StateError('Could not update the credit balances.');
-      }
-      if (!await prefs.setString(_repaymentsKey, jsonEncode(repayments))) {
-        if (oldSales != null) await prefs.setString(_salesKey, oldSales);
-        throw StateError(
-          'Could not save the repayment record. Credit balances were restored.',
-        );
-      }
+      await saveShopRecords(prefs, {
+        _salesKey: jsonEncode(currentSales),
+        _repaymentsKey: jsonEncode(repayments),
+      });
       if (mounted) {
         setState(() {
           _repayments = repayments;
@@ -314,7 +333,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
     final noteController = TextEditingController();
     String category = 'Shop supplies';
     String? error;
-    final draft = await showDialog<Map<String, dynamic>>(
+    final route = DialogRoute<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
@@ -412,10 +431,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
         ),
       ),
     );
+    final draft = await Navigator.of(context, rootNavigator: true).push(route);
+    await route.completed;
     titleController.dispose();
     amountController.dispose();
     noteController.dispose();
-    if (draft == null || !mounted) return;
+    if (draft == null || !mounted || _busy) return;
     setState(() => _busy = true);
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -496,9 +517,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       );
       if (file == null) return;
       final decoded = jsonDecode(utf8.decode(await file.readAsBytes()));
-      if (decoded is! Map || decoded['format'] != 'electrical_shop_backup_v1') {
-        throw const FormatException('This is not a supported shop backup.');
-      }
+      validateShopBackup(decoded);
       if (!mounted) return;
       final confirm = await showDialog<bool>(
         context: context,
@@ -920,7 +939,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
           _metric(
             'Estimated net profit',
             _money(_netProfit),
-            'Costed sales less expenses',
+            'Costed sales less operating expenses',
             Icons.savings_outlined,
             const Color(0xFFE7EEE8),
           ),
@@ -1109,7 +1128,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             ),
           pw.SizedBox(height: 18),
           pw.Text(
-            'Profit is estimated from sales items with saved cost prices, less recorded expenses.',
+            'Profit is estimated from sales items with saved cost prices, less operating expenses. Stock purchases are included through cost of goods sold.',
             style: const pw.TextStyle(
               fontSize: 9,
               color: PdfColors.blueGrey700,

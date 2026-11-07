@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -27,6 +29,7 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
   String? _message;
   bool _messageIsError = false;
   bool _isAdmin = false;
+  StreamSubscription<AuthState>? _authSubscription;
 
   User? get _user => _client.auth.currentUser;
 
@@ -34,33 +37,43 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
   void initState() {
     super.initState();
     _refreshStatus();
-    _client.auth.onAuthStateChange.listen((_) => _refreshStatus());
+    _authSubscription = _client.auth.onAuthStateChange.listen(
+      (_) => _refreshStatus(),
+    );
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _refreshStatus() async {
-    final pending = await ShopSyncService.instance.pendingCount();
-    final lastSync = await ShopSyncService.instance.lastSyncAt();
-    var isAdmin = false;
     try {
-      isAdmin = await AppControlService.instance.isCurrentUserAdmin().timeout(
-        const Duration(seconds: 4),
-      );
+      final pending = await ShopSyncService.instance.pendingCount();
+      final lastSync = await ShopSyncService.instance.lastSyncAt();
+      var isAdmin = false;
+      try {
+        isAdmin = await AppControlService.instance.isCurrentUserAdmin().timeout(
+          const Duration(seconds: 4),
+        );
+      } catch (_) {
+        isAdmin = false;
+      }
+      if (!mounted) return;
+      setState(() {
+        _pending = pending;
+        _lastSync = lastSync;
+        _isAdmin = isAdmin;
+      });
     } catch (_) {
-      isAdmin = false;
+      _setMessage(
+        'Could not read local sync records. Restore a valid backup before syncing.',
+        isError: true,
+      );
     }
-    if (!mounted) return;
-    setState(() {
-      _pending = pending;
-      _lastSync = lastSync;
-      _isAdmin = isAdmin;
-    });
   }
 
   Future<void> _submitAuth() async {

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/products_screen.dart';
+import 'shop_storage.dart';
 
 const _queueKey = 'electrical_shop_sync_queue_v1';
 const _baselineKey = 'electrical_shop_sync_baseline_v1';
@@ -44,6 +45,7 @@ class ShopSyncService {
   ShopSyncService._();
   static final ShopSyncService instance = ShopSyncService._();
   SupabaseClient get _client => Supabase.instance.client;
+  bool _syncing = false;
 
   Future<int> pendingCount() async {
     final prefs = await SharedPreferences.getInstance();
@@ -82,6 +84,18 @@ class ShopSyncService {
   }
 
   Future<ShopSyncResult> syncNow() async {
+    if (_syncing) {
+      throw const ShopSyncException('A sync is already running. Please wait.');
+    }
+    _syncing = true;
+    try {
+      return await _syncNow();
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  Future<ShopSyncResult> _syncNow() async {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const ShopSyncException(
@@ -255,6 +269,19 @@ class ShopSyncService {
       };
     }
 
+    // Protect edits made while the cloud requests were in flight.
+    for (final dataSet in _dataSets) {
+      final current = recordsByType[dataSet.entityType]!;
+      final uploaded = baseline[dataSet.entityType] ?? const <String, String>{};
+      if (current.length != uploaded.length ||
+          current.entries.any(
+            (entry) => uploaded[entry.key] != jsonEncode(entry.value),
+          )) {
+        throw const ShopSyncException(
+          'Shop records changed while syncing. Your local changes are saved. Sync again to include them.',
+        );
+      }
+    }
     var applied = 0;
     for (final event in events) {
       final type = event['entity_type'] as String?;
@@ -276,6 +303,7 @@ class ShopSyncService {
       }
     }
 
+    final updates = <String, String>{};
     for (final dataSet in _dataSets) {
       final records = recordsByType[dataSet.entityType]!;
       final list = records.values.toList();
@@ -284,17 +312,13 @@ class ShopSyncService {
       final current = currentRaw == null
           ? <Map<String, dynamic>>[]
           : _decodeMapList(currentRaw);
-      if (jsonEncode(current) != encoded &&
-          !await prefs.setString(dataSet.storageKey, encoded)) {
-        throw ShopSyncException(
-          'Could not save synced ${dataSet.entityType} records on this device.',
-        );
-      }
+      if (jsonEncode(current) != encoded) updates[dataSet.storageKey] = encoded;
       baseline[dataSet.entityType] = {
         for (final record in list)
           if (record['id'] != null) record['id'].toString(): jsonEncode(record),
       };
     }
+    await saveShopRecords(prefs, updates);
     return applied;
   }
 
@@ -302,31 +326,34 @@ class ShopSyncService {
     SharedPreferences prefs,
     String key,
   ) {
-    final raw = prefs.getString(key);
-    if (raw == null) return [];
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
-      return decoded
-          .whereType<Map>()
-          .map((row) => Map<String, dynamic>.from(row))
-          .toList();
-    } on FormatException {
-      return [];
+    final records = _decodeMapList(prefs.getString(key));
+    final ids = <String>{};
+    for (final record in records) {
+      final id = record['id'];
+      if (id is! String || id.isEmpty || !ids.add(id)) {
+        throw const ShopSyncException(
+          'Local records have missing or duplicate IDs. Sync was stopped to protect your records.',
+        );
+      }
     }
+    return records;
   }
 
   List<Map<String, dynamic>> _decodeMapList(String? raw) {
     if (raw == null) return [];
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
+      if (decoded is! List || decoded.any((row) => row is! Map)) {
+        throw const FormatException('Invalid local records');
+      }
       return decoded
           .whereType<Map>()
           .map((row) => Map<String, dynamic>.from(row))
           .toList();
-    } on FormatException {
-      return [];
+    } catch (_) {
+      throw const ShopSyncException(
+        'Local shop data is damaged. Sync was stopped to protect your records. Restore a valid backup.',
+      );
     }
   }
 
@@ -334,7 +361,9 @@ class ShopSyncService {
     if (raw == null) return {};
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! Map) return {};
+      if (decoded is! Map || decoded.values.any((value) => value is! Map)) {
+        throw const FormatException('Invalid sync baseline');
+      }
       return {
         for (final entry in decoded.entries)
           if (entry.value is Map)
@@ -343,8 +372,10 @@ class ShopSyncService {
                 row.key.toString(): row.value.toString(),
             },
       };
-    } on FormatException {
-      return {};
+    } catch (_) {
+      throw const ShopSyncException(
+        'Local sync history is damaged. Sync was stopped to protect your records.',
+      );
     }
   }
 
@@ -388,7 +419,9 @@ class ShopSyncService {
     final bytes = List<int>.generate(16, (_) => Random.secure().nextInt(256));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    final hex = bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
         '${hex.substring(20)}';

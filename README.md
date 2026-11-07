@@ -12,7 +12,11 @@ The fixed browser origin matters: browser storage, including the owner PIN and l
 
 ## Owner access
 
-Set the six-digit owner PIN once. On later runs from the same browser origin, enter that PIN to unlock the shop. The PIN is stored by the platform secure-storage plugin; it is not sent to Supabase. The separate Cloud Sync sign-in uses Supabase Auth.
+Set an owner password / PIN of at least four characters. On later runs from the same browser origin, enter it to unlock the shop. Access is cached locally so the shop can work offline. The separate Cloud Sync sign-in uses Supabase Auth.
+
+The shared shop password uses a hash in Supabase. Only approved admins can publish a shared password from the updated app. Apply `supabase/migrations/20261107000000_harden_shop_security.sql` in the Supabase SQL Editor after the existing migrations: it removes anonymous password writes and replaces public hash reads with boolean verification functions. Existing local passwords remain usable. This local access gate does not replace Supabase authentication or database row-level security.
+
+The web site publishes compiled files from the root of the `gh-pages` branch. Build with `flutter build web --release --base-href /nanakay-electrical-shop/`, then publish the contents of `build/web` to that branch.
 
 If you previously ran the app at a different URL/port, open that exact URL and note/export any records there before switching; browser origins have separate data stores.
 

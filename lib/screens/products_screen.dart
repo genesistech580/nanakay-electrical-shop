@@ -442,95 +442,354 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
-  Future<void> _receiveStock(Product product) async {
+  Future<void> _receiveStock(Product product) =>
+      _showRecordPurchaseDialog(initialProduct: product);
+
+  Future<void> _showRecordPurchaseDialog({Product? initialProduct}) async {
+    if (_products.isEmpty && initialProduct == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please add at least one product before recording a purchase.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Keep dropdown identities stable while inventory refreshes after a save.
+    final purchaseProducts = List<Product>.of(_products);
+    Product? selectedProduct = initialProduct ?? purchaseProducts.first;
+    DateTime purchaseDate = DateTime.now();
     final quantityController = TextEditingController();
+    final amountSpentController = TextEditingController();
     final noteController = TextEditingController();
+    bool recordAsExpense = true;
+    bool updateCostPrice = true;
     String? error;
-    final receipt = await showDialog<Map<String, dynamic>>(
+
+    final purchaseRoute = DialogRoute<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, refreshDialog) => AlertDialog(
-          scrollable: true,
-          title: Text('Receive ${product.name}'),
-          content: SizedBox(
-            width: 380,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Current stock: ${product.quantity} units',
-                  style: const TextStyle(color: Color(0xFF68736D)),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: quantityController,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Units received',
-                    prefixIcon: Icon(Icons.inventory_2_outlined),
+        builder: (context, refreshDialog) {
+          final qty = int.tryParse(quantityController.text.trim()) ?? 0;
+          final totalSpent =
+              double.tryParse(amountSpentController.text.trim()) ?? 0;
+          final unitCostPreview =
+              (qty > 0 && totalSpent.isFinite && totalSpent > 0)
+              ? (totalSpent / qty)
+              : null;
+
+          return AlertDialog(
+            scrollable: true,
+            title: Row(
+              children: const [
+                CircleAvatar(
+                  backgroundColor: Color(0xFFE7EEE8),
+                  child: Icon(
+                    Icons.add_shopping_cart,
+                    color: Color(0xFF3D6555),
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteController,
-                  decoration: const InputDecoration(
-                    labelText: 'Supplier or note (optional)',
-                    prefixIcon: Icon(Icons.local_shipping_outlined),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'New Stock Purchase',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-                if (error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(error!, style: const TextStyle(color: Colors.red)),
-                ],
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Record newly bought stock with date, quantity, and amount spent.',
+                    style: TextStyle(color: Color(0xFF68736D), fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  if (initialProduct == null) ...[
+                    DropdownButtonFormField<Product>(
+                      initialValue: selectedProduct,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Product',
+                        prefixIcon: Icon(Icons.inventory_2_outlined),
+                      ),
+                      items: purchaseProducts.map((p) {
+                        return DropdownMenuItem<Product>(
+                          value: p,
+                          child: Text(
+                            '${p.name} (Current: ${p.quantity})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (p) =>
+                          refreshDialog(() => selectedProduct = p),
+                    ),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4F1E8),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.inventory_2,
+                            color: Color(0xFF3D6555),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedProduct!.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Current stock: ${selectedProduct!.quantity} units',
+                                  style: const TextStyle(
+                                    color: Color(0xFF68736D),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: purchaseDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        refreshDialog(() => purchaseDate = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Purchase Date',
+                        prefixIcon: Icon(Icons.calendar_today_outlined),
+                        suffixIcon: Icon(Icons.arrow_drop_down),
+                      ),
+                      child: Text(
+                        '${purchaseDate.day.toString().padLeft(2, '0')}/${purchaseDate.month.toString().padLeft(2, '0')}/${purchaseDate.year}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: quantityController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Quantity purchased',
+                      prefixIcon: Icon(Icons.numbers_outlined),
+                      hintText: 'e.g. 20',
+                    ),
+                    onChanged: (_) => refreshDialog(() {}),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: amountSpentController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Total amount spent (GHS)',
+                      prefixIcon: Icon(Icons.payments_outlined),
+                      hintText: 'e.g. 500.00',
+                    ),
+                    onChanged: (_) => refreshDialog(() {}),
+                  ),
+                  if (unitCostPreview != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Calculated unit cost: GHS ${unitCostPreview.toStringAsFixed(2)} per item',
+                      style: const TextStyle(
+                        color: Color(0xFF3D6555),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: noteController,
+                    decoration: const InputDecoration(
+                      labelText: 'Supplier / Market / Note (optional)',
+                      prefixIcon: Icon(Icons.storefront_outlined),
+                      hintText: 'e.g. Wholesale Market, Accra',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('Record as business expense in Finances'),
+                    subtitle: const Text(
+                      'Keeps your financial records and cash flow accurate',
+                    ),
+                    value: recordAsExpense,
+                    onChanged: (val) =>
+                        refreshDialog(() => recordAsExpense = val ?? true),
+                  ),
+                  if (unitCostPreview != null)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(
+                        'Update product cost price to GHS ${unitCostPreview.toStringAsFixed(2)}',
+                      ),
+                      value: updateCostPrice,
+                      onChanged: (val) =>
+                          refreshDialog(() => updateCostPrice = val ?? true),
+                    ),
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(error!, style: const TextStyle(color: Colors.red)),
+                  ],
+                ],
+              ),
             ),
-            FilledButton(
-              onPressed: () {
-                final amount = int.tryParse(quantityController.text.trim());
-                if (amount == null || amount <= 0) {
-                  refreshDialog(
-                    () => error = 'Enter a whole number greater than zero.',
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final amount = int.tryParse(quantityController.text.trim());
+                  if (amount == null || amount <= 0) {
+                    refreshDialog(
+                      () => error =
+                          'Please enter a valid quantity greater than zero.',
+                    );
+                    return;
+                  }
+                  final totalSpent = double.tryParse(
+                    amountSpentController.text.trim(),
                   );
-                  return;
-                }
-                Navigator.pop(dialogContext, {
-                  'quantity': amount,
-                  'note': noteController.text.trim(),
-                });
-              },
-              child: const Text('Receive stock'),
-            ),
-          ],
-        ),
+                  if (totalSpent == null ||
+                      !totalSpent.isFinite ||
+                      totalSpent < 0) {
+                    refreshDialog(
+                      () => error = 'Enter a valid amount of zero or more.',
+                    );
+                    return;
+                  }
+                  if (selectedProduct == null) {
+                    refreshDialog(() => error = 'Please select a product.');
+                    return;
+                  }
+                  Navigator.pop(dialogContext, {
+                    'product': selectedProduct,
+                    'quantity': amount,
+                    'amountSpent': totalSpent,
+                    'unitCost': (totalSpent > 0 && amount > 0)
+                        ? (totalSpent / amount)
+                        : selectedProduct!.costPrice,
+                    'purchaseDate': purchaseDate,
+                    'note': noteController.text.trim(),
+                    'recordAsExpense': recordAsExpense,
+                    'updateCostPrice': updateCostPrice,
+                  });
+                },
+                child: const Text('Save Purchase'),
+              ),
+            ],
+          );
+        },
       ),
     );
-    quantityController.dispose();
-    noteController.dispose();
-    if (receipt == null || !mounted || _isSaving) return;
 
-    final amount = receipt['quantity'] as int;
+    final result = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(purchaseRoute);
+    await purchaseRoute.completed;
+    quantityController.dispose();
+    amountSpentController.dispose();
+    noteController.dispose();
+
+    if (result == null || !mounted || _isSaving) return;
+    await _executeRecordPurchase(result);
+  }
+
+  Future<void> _executeRecordPurchase(Map<String, dynamic> data) async {
+    final product = data['product'] as Product;
+    final quantity = data['quantity'] as int;
+    final amountSpent = data['amountSpent'] as double;
+    final unitCost = data['unitCost'] as double;
+    final purchaseDate = data['purchaseDate'] as DateTime;
+    final note = data['note'] as String;
+    final recordAsExpense = data['recordAsExpense'] as bool;
+    final updateCostPrice = data['updateCostPrice'] as bool;
+
     final originalQuantity = product.quantity;
+    final originalCostPrice = product.costPrice;
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted || _isSaving) return;
     final originalProducts = prefs.getString(_productsStorageKey);
     final oldReceipts = prefs.getString(_stockReceiptsStorageKey);
+    final oldExpenses = prefs.getString('electrical_shop_expenses_v1');
+
+    final storedProducts = originalProducts == null
+        ? <Product>[]
+        : (jsonDecode(originalProducts) as List)
+              .map(
+                (row) => _productFromMap(Map<String, dynamic>.from(row as Map)),
+              )
+              .toList();
+    if (!_products.contains(product) ||
+        jsonEncode(storedProducts.map(_productToMap).toList()) !=
+            jsonEncode(_products.map(_productToMap).toList())) {
+      await _loadProducts();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Inventory changed. Reopen the purchase and review the stock before saving.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isSaving = true;
       _storageError = null;
-      product.quantity += amount;
+      product.quantity += quantity;
+      if (updateCostPrice && unitCost > 0) {
+        product.costPrice = unitCost;
+      }
     });
+
     try {
       final productsSaved = await prefs.setString(
         _productsStorageKey,
         jsonEncode(_products.map(_productToMap).toList()),
       );
       if (!productsSaved) throw StateError('Could not update inventory.');
+
       final receipts = oldReceipts == null
           ? <dynamic>[]
           : jsonDecode(oldReceipts) as List<dynamic>;
@@ -538,23 +797,47 @@ class _ProductsScreenState extends State<ProductsScreen> {
         'id': DateTime.now().microsecondsSinceEpoch.toString(),
         'productId': product.id,
         'productName': product.name,
-        'quantity': amount,
-        'note': receipt['note'],
-        'date': DateTime.now().toIso8601String(),
+        'quantity': quantity,
+        'amountSpent': amountSpent,
+        'unitCost': unitCost,
+        'note': note,
+        'date': purchaseDate.toIso8601String(),
       });
       if (!await prefs.setString(
         _stockReceiptsStorageKey,
         jsonEncode(receipts),
       )) {
-        throw StateError('Could not save the stock receipt record.');
+        throw StateError('Could not save the stock purchase record.');
       }
+
+      if (recordAsExpense && amountSpent > 0) {
+        final expenses = oldExpenses == null
+            ? <dynamic>[]
+            : jsonDecode(oldExpenses) as List<dynamic>;
+        expenses.insert(0, {
+          'id': DateTime.now().microsecondsSinceEpoch.toString(),
+          'title': 'Stock Purchase: ${product.name}',
+          'category': 'Stock Purchase',
+          'amount': amountSpent,
+          'date': purchaseDate.toIso8601String(),
+          'note': '$quantity units${note.isNotEmpty ? ' · $note' : ''}',
+        });
+        if (!await prefs.setString(
+          'electrical_shop_expenses_v1',
+          jsonEncode(expenses),
+        )) {
+          throw StateError('Could not save the purchase expense.');
+        }
+      }
+
       productStockChanged.value++;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '$amount ${amount == 1 ? 'unit' : 'units'} added. ${product.name} now has ${product.quantity} in stock.',
+              'Recorded purchase: $quantity units of ${product.name} (GHS ${amountSpent.toStringAsFixed(2)}). Stock is now ${product.quantity}.',
             ),
+            backgroundColor: const Color(0xFF3D6555),
           ),
         );
       }
@@ -564,16 +847,128 @@ class _ProductsScreenState extends State<ProductsScreen> {
       } else {
         await prefs.setString(_productsStorageKey, originalProducts);
       }
+      if (oldReceipts == null) {
+        await prefs.remove(_stockReceiptsStorageKey);
+      } else {
+        await prefs.setString(_stockReceiptsStorageKey, oldReceipts);
+      }
+      if (oldExpenses != null) {
+        await prefs.setString('electrical_shop_expenses_v1', oldExpenses);
+      } else {
+        await prefs.remove('electrical_shop_expenses_v1');
+      }
       if (mounted) {
         setState(() {
           product.quantity = originalQuantity;
+          product.costPrice = originalCostPrice;
           _storageError = e is StateError
               ? e.message
-              : 'Could not receive stock. Please try again.';
+              : 'Could not record purchase.';
         });
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _showPurchaseHistoryDialog() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_stockReceiptsStorageKey);
+      final receipts = raw == null
+          ? <Map<String, dynamic>>[]
+          : (jsonDecode(raw) as List)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.history_rounded, color: Color(0xFF3D6555)),
+              SizedBox(width: 10),
+              Expanded(child: Text('Stock Purchases History')),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            height: 400,
+            child: receipts.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No stock purchases recorded yet.',
+                      style: TextStyle(color: Color(0xFF68736D)),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: receipts.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final item = receipts[index];
+                      final dateStr = item['date'] as String? ?? '';
+                      final parsedDate = DateTime.tryParse(dateStr)?.toLocal();
+                      final dateFormatted = parsedDate != null
+                          ? '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}'
+                          : dateStr;
+                      final name = item['productName'] as String? ?? 'Item';
+                      final qty = item['quantity'] ?? 0;
+                      final amountSpent = (item['amountSpent'] as num?)
+                          ?.toDouble();
+                      final note = (item['note'] as String? ?? '').trim();
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 4,
+                        ),
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFE7EEE8),
+                          child: Icon(
+                            Icons.shopping_bag_outlined,
+                            color: Color(0xFF3D6555),
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '$dateFormatted · Quantity: $qty units${note.isNotEmpty ? '\n$note' : ''}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        isThreeLine: note.isNotEmpty,
+                        trailing: Text(
+                          amountSpent != null && amountSpent > 0
+                              ? 'GHS ${amountSpent.toStringAsFixed(2)}'
+                              : 'Stock added',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: amountSpent != null && amountSpent > 0
+                                ? const Color(0xFFB42318)
+                                : const Color(0xFF3D6555),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load purchase history. Please try again.'),
+        ),
+      );
     }
   }
 
@@ -603,16 +998,50 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
+          if (MediaQuery.sizeOf(context).width < 600)
+            IconButton(
+              tooltip: 'New purchase',
+              onPressed: _isLoading || _isSaving
+                  ? null
+                  : () => _showRecordPurchaseDialog(),
+              icon: const Icon(Icons.add_shopping_cart),
+            )
+          else
+            FilledButton.icon(
+              onPressed: _isLoading || _isSaving
+                  ? null
+                  : () => _showRecordPurchaseDialog(),
+              icon: const Icon(Icons.add_shopping_cart, size: 18),
+              label: const Text('New purchase'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF3D6555),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          const SizedBox(width: 8),
+          if (MediaQuery.sizeOf(context).width < 600)
+            IconButton(
+              tooltip: 'Add product',
               onPressed: _isLoading || _isSaving
                   ? null
                   : () => _showProductForm(),
               icon: const Icon(Icons.add),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: _isLoading || _isSaving
+                  ? null
+                  : () => _showProductForm(),
+              icon: const Icon(Icons.add, size: 18),
               label: const Text('Add product'),
             ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Purchase history',
+            icon: const Icon(Icons.history_rounded),
+            onPressed: _showPurchaseHistoryDialog,
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(

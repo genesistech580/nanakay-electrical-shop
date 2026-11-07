@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../services/shop_storage.dart';
 
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
@@ -149,9 +150,9 @@ class _SalesScreenState extends State<SalesScreen> {
                 ),
                 pw.SizedBox(height: 10),
                 pw.Text(
-                  'ELECTRICAL SHOP',
+                  'NANAKAY ELECTRICAL SHOP',
                   style: pw.TextStyle(
-                    fontSize: 19,
+                    fontSize: 18,
                     fontWeight: pw.FontWeight.bold,
                     color: const PdfColor.fromInt(0xFF24352F),
                   ),
@@ -285,7 +286,7 @@ class _SalesScreenState extends State<SalesScreen> {
           pw.SizedBox(height: 30),
           pw.Center(
             child: pw.Text(
-              'Thank you for shopping with us.',
+              'Thank you for shopping with NanaKay Electrical Shop.',
               style: const pw.TextStyle(color: PdfColors.blueGrey600),
             ),
           ),
@@ -338,7 +339,21 @@ class _SalesScreenState extends State<SalesScreen> {
           color: Color(0xFF159455),
           size: 34,
         ),
-        title: const Text('Sale recorded'),
+        title: Column(
+          children: const [
+            Text(
+              'NANAKAY ELECTRICAL SHOP',
+              style: TextStyle(
+                fontSize: 13,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF3D6555),
+              ),
+            ),
+            SizedBox(height: 4),
+            Text('Sale recorded'),
+          ],
+        ),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -455,6 +470,12 @@ class _SalesScreenState extends State<SalesScreen> {
             'Stock changed for ${line.product.name}. Refresh and review your cart.',
           );
         }
+        if (map['sellingPrice'] != line.product.sellingPrice ||
+            map['costPrice'] != line.product.costPrice) {
+          throw StateError(
+            'Prices changed for ${line.product.name}. Remove it from your cart and add it again.',
+          );
+        }
       }
       for (final line in _cart.values) {
         final map = byId[line.product.id]!;
@@ -489,16 +510,10 @@ class _SalesScreenState extends State<SalesScreen> {
             .toList(),
       };
       sales.insert(0, recordedSale);
-      final previousProducts = rawProducts;
-      if (!await prefs.setString(_productsKey, jsonEncode(updatedProducts))) {
-        throw StateError('Could not update stock. The sale was not recorded.');
-      }
-      if (!await prefs.setString(_salesKey, jsonEncode(sales))) {
-        if (previousProducts != null) {
-          await prefs.setString(_productsKey, previousProducts);
-        }
-        throw StateError('Could not save sale history. Stock was restored.');
-      }
+      await saveShopRecords(prefs, {
+        _productsKey: jsonEncode(updatedProducts),
+        _salesKey: jsonEncode(sales),
+      });
       productStockChanged.value++;
       if (!mounted) return;
       setState(() {

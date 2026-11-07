@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_control_service.dart';
 
 class ShopSecurityService {
   ShopSecurityService._();
@@ -39,6 +40,15 @@ class ShopSecurityService {
     // 3. Check Supabase cloud database
     try {
       final client = Supabase.instance.client;
+      try {
+        return await client
+                .rpc('shop_password_configured')
+                .timeout(const Duration(seconds: 4)) !=
+            true;
+      } on PostgrestException catch (error) {
+        // Compatibility until the security migration is installed.
+        if (error.code != 'PGRST202' && error.code != '42883') rethrow;
+      }
       final response = await client
           .from('shop_security')
           .select('pin_hash')
@@ -79,27 +89,44 @@ class ShopSecurityService {
   /// Saves the password to both local persistent storage and the database.
   Future<void> savePassword(String password) async {
     final trimmed = password.trim();
+    if (trimmed.length < 4) {
+      throw const FormatException(
+        'Use at least 4 characters for your password / PIN.',
+      );
+    }
+    var savedLocally = false;
 
     // 1. Save to local secure storage
     try {
       await _secureStorage.write(key: _pinKey, value: trimmed);
+      savedLocally = true;
     } catch (_) {}
 
     // 2. Save to local SharedPreferences database
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_pinKey, trimmed);
+      savedLocally = await prefs.setString(_pinKey, trimmed) || savedLocally;
     } catch (_) {}
+
+    if (!savedLocally) {
+      throw StateError(
+        'Could not save owner access on this device. Please try again.',
+      );
+    }
 
     // 3. Save hashed password to Supabase database
     try {
       final client = Supabase.instance.client;
+      if (!await AppControlService.instance.isCurrentUserAdmin()) return;
       final pinHash = hashPassword(trimmed);
-      await client.from('shop_security').upsert({
-        'id': 1,
-        'pin_hash': pinHash,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).timeout(const Duration(seconds: 5));
+      await client
+          .from('shop_security')
+          .upsert({
+            'id': 1,
+            'pin_hash': pinHash,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .timeout(const Duration(seconds: 5));
     } catch (_) {
       // Table may not have been created yet in Supabase or client is offline.
       // Local database storage succeeded so the app remains fully functional.
@@ -119,6 +146,18 @@ class ShopSecurityService {
     // 2. Check against Supabase cloud database
     try {
       final client = Supabase.instance.client;
+      try {
+        final valid = await client
+            .rpc(
+              'verify_shop_password',
+              params: {'candidate_hash': hashPassword(trimmed)},
+            )
+            .timeout(const Duration(seconds: 5));
+        if (valid == true) await savePassword(trimmed);
+        return valid == true;
+      } on PostgrestException catch (error) {
+        if (error.code != 'PGRST202' && error.code != '42883') rethrow;
+      }
       final response = await client
           .from('shop_security')
           .select('pin_hash')
