@@ -69,6 +69,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
+    - assets/fonts/LICENSE.txt
     - assets/brand/nanakay_mark_light.png
     - assets/brand/nanakay_mark_dark.png
     - assets/brand/nanakay_logo.png

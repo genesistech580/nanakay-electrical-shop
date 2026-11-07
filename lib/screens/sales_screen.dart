@@ -2,8 +2,11 @@ import 'dart:convert';
 import '../services/shop_storage.dart';
 
 import 'package:flutter/material.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
+import 'package:flutter/services.dart';
+import '../services/customer_receipt.dart';
+import '../services/shop_profile.dart';
+import '../widgets/shop_profile_dialog.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/product.dart';
@@ -127,207 +130,44 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _printReceipt(Map<String, dynamic> sale) async {
-    final items = (sale['items'] as List<dynamic>? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList();
-    final date = DateTime.tryParse(sale['date'] as String? ?? '')?.toLocal();
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
-        build: (context) => [
-          pw.Center(
-            child: pw.Column(
-              children: [
-                pw.Container(
-                  width: 42,
-                  height: 4,
-                  decoration: const pw.BoxDecoration(
-                    color: PdfColor.fromInt(0xFF3D6555),
-                    borderRadius: pw.BorderRadius.all(pw.Radius.circular(2)),
-                  ),
-                ),
-                pw.SizedBox(height: 10),
-                pw.Text(
-                  'NANAKAY ELECTRICAL SHOP',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                    color: const PdfColor.fromInt(0xFF24352F),
-                  ),
-                ),
-                pw.Text(
-                  'SALES RECEIPT',
-                  style: const pw.TextStyle(
-                    fontSize: 10,
-                    color: PdfColors.blueGrey600,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 28),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.blueGrey50,
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'Receipt #${_saleId(sale)}',
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      date == null
-                          ? 'Date unavailable'
-                          : '${date.day}/${date.month}/${date.year}  ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
-                    ),
-                  ],
-                ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      'PAYMENT',
-                      style: const pw.TextStyle(
-                        fontSize: 8,
-                        color: PdfColors.blueGrey600,
-                      ),
-                    ),
-                    pw.Text(
-                      (sale['payment'] as String? ?? 'cash').toUpperCase(),
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if ((sale['customer'] as String? ?? '').trim().isNotEmpty) ...[
-            pw.SizedBox(height: 14),
-            pw.Text('Customer: ${(sale['customer'] as String).trim()}'),
-          ],
-          if ((sale['customerPhone'] as String? ?? '').trim().isNotEmpty)
-            pw.Text('Phone: ${(sale['customerPhone'] as String).trim()}'),
-          pw.SizedBox(height: 24),
-          pw.Table(
-            columnWidths: {
-              0: const pw.FlexColumnWidth(4),
-              1: const pw.FlexColumnWidth(1),
-              2: const pw.FlexColumnWidth(2),
-            },
-            border: pw.TableBorder(
-              bottom: const pw.BorderSide(color: PdfColors.blueGrey100),
-            ),
-            children: [
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(
-                  color: PdfColor.fromInt(0xFFF4F1E8),
-                ),
-                children: [
-                  _pdfCell('ITEM', bold: true),
-                  _pdfCell('QTY', bold: true, align: pw.TextAlign.center),
-                  _pdfCell('AMOUNT', bold: true, align: pw.TextAlign.right),
-                ],
-              ),
-              ...items.map((item) {
-                final qty = (item['quantity'] as num?)?.toInt() ?? 0;
-                final unitPrice = (item['unitPrice'] as num?)?.toDouble() ?? 0;
-                final amount =
-                    (item['lineTotal'] as num?)?.toDouble() ?? unitPrice * qty;
-                return pw.TableRow(
-                  children: [
-                    _pdfCell(
-                      '${item['name'] ?? 'Item'}\n${_money(unitPrice)} each',
-                    ),
-                    _pdfCell('$qty', align: pw.TextAlign.center),
-                    _pdfCell(_money(amount), align: pw.TextAlign.right),
-                  ],
-                );
-              }),
-            ],
-          ),
-          pw.SizedBox(height: 20),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.end,
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.Text(
-                    'TOTAL',
-                    style: const pw.TextStyle(
-                      fontSize: 9,
-                      color: PdfColors.blueGrey600,
-                    ),
-                  ),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    _money((sale['total'] as num?)?.toDouble() ?? 0),
-                    style: pw.TextStyle(
-                      fontSize: 20,
-                      fontWeight: pw.FontWeight.bold,
-                      color: const PdfColor.fromInt(0xFF24352F),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 30),
-          pw.Center(
-            child: pw.Text(
-              'Thank you for shopping with NanaKay Electrical Shop.',
-              style: const pw.TextStyle(color: PdfColors.blueGrey600),
-            ),
-          ),
-        ],
-      ),
-    );
     try {
+      final shop = sale['shop'] is Map
+          ? ShopProfile.fromMap(Map<String, dynamic>.from(sale['shop'] as Map))
+          : await ShopProfile.load();
+      final logo = await rootBundle.load('assets/brand/nanakay_mark_dark.png');
+      final regularFont = await rootBundle.load(
+        'assets/fonts/Roboto-Regular.ttf',
+      );
+      final boldFont = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+      if (!mounted) return;
       await showPdfDocumentPreview(
         context,
-        title: 'Receipt preview',
-        fileName: 'receipt-${_saleId(sale)}.pdf',
-        buildPdf: (_) async => pdf.save(),
+        title: 'Customer receipt',
+        fileName: 'nanakay-receipt-${sale['id']}.pdf',
+        buildPdf: (_) => buildCustomerReceipt(
+          sale: sale,
+          shop: shop,
+          regularFont: regularFont.buffer.asUint8List(
+            regularFont.offsetInBytes,
+            regularFont.lengthInBytes,
+          ),
+          boldFont: boldFont.buffer.asUint8List(
+            boldFont.offsetInBytes,
+            boldFont.lengthInBytes,
+          ),
+          logo: logo.buffer.asUint8List(logo.offsetInBytes, logo.lengthInBytes),
+        ),
       );
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Could not open the print dialog. Check your printer or PDF viewer.',
-            ),
+            content: Text('Could not prepare this receipt. Please try again.'),
           ),
         );
       }
     }
   }
-
-  pw.Widget _pdfCell(
-    String text, {
-    bool bold = false,
-    pw.TextAlign align = pw.TextAlign.left,
-  }) => pw.Padding(
-    padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-    child: pw.Text(
-      text,
-      textAlign: align,
-      style: pw.TextStyle(
-        fontSize: 10,
-        fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      ),
-    ),
-  );
 
   Future<void> _showReceipt(Map<String, dynamic> sale) async {
     await showDialog<void>(
@@ -405,6 +245,11 @@ class _SalesScreenState extends State<SalesScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Receipt shop details',
+            icon: const Icon(Icons.storefront_outlined),
+            onPressed: _saving ? null : () => showShopProfileDialog(context),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Done'),
@@ -455,6 +300,7 @@ class _SalesScreenState extends State<SalesScreen> {
     }
     setState(() => _saving = true);
     try {
+      final shop = await ShopProfile.load();
       final prefs = await SharedPreferences.getInstance();
       final rawProducts = prefs.getString(_productsKey);
       final stored = rawProducts == null
@@ -495,6 +341,7 @@ class _SalesScreenState extends State<SalesScreen> {
         'payment': _payment.name,
         'customer': _customerController.text.trim(),
         'customerPhone': _customerPhoneController.text.trim(),
+        'shop': shop.toMap(),
         'total': _total,
         'items': _cart.values
             .map(
@@ -563,6 +410,11 @@ class _SalesScreenState extends State<SalesScreen> {
                   : Icons.receipt_long_outlined,
             ),
             label: Text(_showHistory ? 'New sale' : 'History'),
+          ),
+          IconButton(
+            tooltip: 'Receipt shop details',
+            icon: const Icon(Icons.storefront_outlined),
+            onPressed: _saving ? null : () => showShopProfileDialog(context),
           ),
           if (_saving)
             const Padding(

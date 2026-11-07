@@ -68,30 +68,30 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('New purchase'));
     await tester.pumpAndSettle();
-    final quantity = find.widgetWithText(TextField, 'Quantity purchased');
-    final amount = find.widgetWithText(TextField, 'Total amount spent (GHS)');
+    final quantity = find.widgetWithText(TextFormField, 'Quantity purchased');
+    final amount = find.widgetWithText(
+      TextFormField,
+      'Total amount spent (GHS)',
+    );
     await tester.enterText(quantity, '4');
     await tester.enterText(amount, 'NaN');
-    await tester.ensureVisible(find.text('Save Purchase'));
-    await tester.tap(find.text('Save Purchase'));
+    await tester.ensureVisible(find.text('Save purchase'));
+    await tester.tap(find.text('Save purchase'));
     await tester.pumpAndSettle();
-    expect(find.text('Enter a valid amount of zero or more.'), findsOneWidget);
+    expect(find.text('Enter a valid amount.'), findsOneWidget);
     await tester.enterText(amount, '32');
-    await tester.ensureVisible(find.text('Save Purchase'));
-    await tester.tap(find.text('Save Purchase'));
+    await tester.ensureVisible(find.text('Save purchase'));
+    await tester.tap(find.text('Save purchase'));
     await tester.pumpAndSettle();
     final prefs = await SharedPreferences.getInstance();
     final products =
         jsonDecode(prefs.getString('electrical_shop_products_v1')!) as List;
     expect(products.single['quantity'], 14);
-    expect(products.single['costPrice'], 8);
+    expect(products.single['costPrice'], closeTo(82 / 14, 0.00001));
     final receipts =
         jsonDecode(prefs.getString('electrical_shop_stock_receipts_v1')!)
             as List;
     expect(receipts.single['amountSpent'], 32);
-    final expenses =
-        jsonDecode(prefs.getString('electrical_shop_expenses_v1')!) as List;
-    expect(expenses.single['amount'], 32);
-    expect(expenses.single['category'], 'Stock Purchase');
+    expect(prefs.getString('electrical_shop_expenses_v1'), isNull);
   });
 }

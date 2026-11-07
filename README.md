@@ -51,6 +51,13 @@ The migration allows app installations to read the release/access settings. Only
 **Signing matters:** Android only accepts an in-place update when the new APK has the same application ID and signing key as the installed APK. This project currently signs release APKs with the local Android debug key. Keep the same build computer and back up `%USERPROFILE%\.android\debug.keystore` before distributing updates. Losing or changing that key means Android will reject an update; installing a differently signed build may require uninstalling the old app, which removes its local data. Set up a permanent release keystore before broad distribution.
 
 If **Owner controls** does not appear, verify that the migration was run, the seed statement matched the owner's Supabase email, and the owner is signed in under **Cloud sync**.
+## Purchases, expenses, and customer receipts
+
+- **Products -> New purchase:** add every product in one stock delivery, with quantities, line amounts, date, and supplier. Inventory and purchase history save together. New deliveries do not create operating expenses or immediately reduce estimated profit. Average unit cost combines existing stock value with the new delivery cost when enabled.
+- **Products -> Purchase history:** expand a delivery to review its products and total spend.
+- **Finances -> Expenses & profit:** open an expense's action menu to edit it or delete it after confirmation. Editing preserves the original record date. Existing stock-purchase expenses retain their category so they remain excluded from operating profit deductions.
+- **Sales -> Receipt shop details:** set the shop name, phone, optional address, and email. New sales save a snapshot of these details for future receipt reprints. Receipts include customer information, prices, payment method, amount paid, and balance due.
+
 ## Checks
 
 ```powershell

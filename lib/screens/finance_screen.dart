@@ -327,18 +327,24 @@ class _FinanceScreenState extends State<FinanceScreen> {
     }
   }
 
-  Future<void> _addExpense() async {
-    final titleController = TextEditingController();
-    final amountController = TextEditingController();
-    final noteController = TextEditingController();
-    String category = 'Shop supplies';
+  Future<void> _addExpense({Map<String, dynamic>? expense}) async {
+    final titleController = TextEditingController(
+      text: expense?['title'] as String? ?? '',
+    );
+    final amountController = TextEditingController(
+      text: expense == null ? '' : _value(expense, 'amount').toStringAsFixed(2),
+    );
+    final noteController = TextEditingController(
+      text: expense?['note'] as String? ?? '',
+    );
+    String category = expense?['category'] as String? ?? 'Shop supplies';
     String? error;
     final route = DialogRoute<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
           scrollable: true,
-          title: const Text('Add expense'),
+          title: Text(expense == null ? 'Add expense' : 'Edit expense'),
           content: SizedBox(
             width: 420,
             child: SingleChildScrollView(
@@ -368,14 +374,15 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     initialValue: category,
                     decoration: const InputDecoration(labelText: 'Category'),
                     items:
-                        const [
+                        <String>{
+                              category,
                               'Shop supplies',
                               'Rent',
                               'Transport',
                               'Utilities',
                               'Staff',
                               'Other',
-                            ]
+                            }
                             .map(
                               (value) => DropdownMenuItem(
                                 value: value,
@@ -383,8 +390,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
                               ),
                             )
                             .toList(),
-                    onChanged: (value) =>
-                        refresh(() => category = value ?? 'Other'),
+                    onChanged: expense?['category'] == 'Stock Purchase'
+                        ? null
+                        : (value) => refresh(() => category = value ?? 'Other'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -442,11 +450,22 @@ class _FinanceScreenState extends State<FinanceScreen> {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_expensesKey);
       final expenses = _decodeList(raw);
-      expenses.insert(0, {
+      final updated = {
+        ...?expense,
         ...draft,
-        'id': DateTime.now().microsecondsSinceEpoch.toString(),
-        'date': DateTime.now().toIso8601String(),
-      });
+        'id':
+            expense?['id'] ?? DateTime.now().microsecondsSinceEpoch.toString(),
+        'date': expense?['date'] ?? DateTime.now().toIso8601String(),
+      };
+      if (expense == null) {
+        expenses.insert(0, updated);
+      } else {
+        final index = expenses.indexWhere((row) => row['id'] == expense['id']);
+        if (index < 0 || jsonEncode(expenses[index]) != jsonEncode(expense)) {
+          throw StateError('Expense changed. Refresh and try again.');
+        }
+        expenses[index] = updated;
+      }
       if (!await prefs.setString(_expensesKey, jsonEncode(expenses))) {
         throw StateError('Storage did not confirm the expense save.');
       }
@@ -464,6 +483,56 @@ class _FinanceScreenState extends State<FinanceScreen> {
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteExpense(Map<String, dynamic> expense) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete expense?'),
+        content: Text(
+          'Remove "${expense['title']}" (${_money(_value(expense, 'amount'))}) from your expense records?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete expense'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final expenses = _decodeList(prefs.getString(_expensesKey));
+      final index = expenses.indexWhere((row) => row['id'] == expense['id']);
+      if (index < 0 || jsonEncode(expenses[index]) != jsonEncode(expense)) {
+        throw StateError('Expense changed. Refresh and try again.');
+      }
+      expenses.removeAt(index);
+      await saveShopRecords(prefs, {_expensesKey: jsonEncode(expenses)});
+      if (mounted) setState(() => _expenses = expenses);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message
+                  : 'Could not delete this expense. Please try again.',
+            ),
+          ),
+        );
+      }
+      await _load();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -990,16 +1059,35 @@ class _FinanceScreenState extends State<FinanceScreen> {
             subtitle: Text(
               '${expense['category'] ?? 'Other'} · ${_date(expense['date'])}${(expense['note'] as String? ?? '').isEmpty ? '' : ' · ${expense['note']}'}',
             ),
-            trailing: Text(
-              _money(_value(expense, 'amount')),
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _money(_value(expense, 'amount')),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'Expense actions',
+                  enabled: !_busy,
+                  onSelected: (action) => action == 'edit'
+                      ? _addExpense(expense: expense)
+                      : _deleteExpense(expense),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Edit expense')),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete expense'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
       ),
       const SizedBox(height: 12),
       const Text(
-        'Profit uses only sales with cost prices saved when they were sold, less all recorded expenses. Older sales without saved costs are omitted from the profit estimate.',
+        'Estimated profit is sales margin less operating expenses. Stock purchases do not reduce profit when recorded; their cost is counted when the goods are sold. Older sales without saved costs are omitted.',
         style: TextStyle(color: Color(0xFF68736D), fontSize: 12, height: 1.4),
       ),
     ],
