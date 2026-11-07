@@ -13,10 +13,10 @@ import 'screens/cloud_sync_screen.dart';
 import 'services/supabase_config.dart';
 import 'services/shop_security_service.dart';
 import 'widgets/app_control_gate.dart';
+import 'theme/shop_theme.dart';
 
-const _navy = Color(0xFF24352F);
-const _blue = Color(0xFF3D6555);
-const _canvas = Color(0xFFF4F1E8);
+const _navy = Color(0xFF142B49);
+const _blue = Color(0xFF0879E8);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,56 +32,10 @@ class ElectricalShopApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: _blue,
-      brightness: Brightness.light,
-      surface: const Color(0xFFFFFEFA),
-    );
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'NanaKay Electrical Shop',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: scheme,
-        scaffoldBackgroundColor: _canvas,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: _canvas,
-          foregroundColor: _navy,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFFFFFEFA),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFE3DED2)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFFFFEFA),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFDDD8CC)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFDDD8CC)),
-          ),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: _blue,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          ),
-        ),
-      ),
+      theme: buildShopTheme(),
       home: const OwnerAccessGate(),
     );
   }
@@ -162,7 +116,9 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
   Future<void> _submit() async {
     final pin = _pinController.text.trim();
     if (pin.length < 4) {
-      setState(() => _error = 'Enter at least 4 characters for your password / PIN.');
+      setState(
+        () => _error = 'Enter at least 4 characters for your password / PIN.',
+      );
       return;
     }
     if (_setupRequired && pin != _confirmController.text.trim()) {
@@ -276,7 +232,13 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
     return Scaffold(
       bottomNavigationBar: const _DeveloperCredit(dark: true),
       body: DecoratedBox(
-        decoration: const BoxDecoration(color: Color(0xFF24352F)),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0784F6), Color(0xFF075DC4)],
+          ),
+        ),
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -311,7 +273,7 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
                   const Text(
                     'ELECTRICAL SHOP',
                     style: TextStyle(
-                      color: Color(0xFFD7E1D9),
+                      color: Color(0xFFDCEBFF),
                       fontSize: 11,
                       letterSpacing: 2.4,
                       fontWeight: FontWeight.w600,
@@ -339,7 +301,7 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
                             _setupRequired
                                 ? 'Create a secure password or PIN to protect this shop.'
                                 : 'Enter your owner password or PIN to continue.',
-                            style: const TextStyle(color: Color(0xFF68736D)),
+                            style: const TextStyle(color: Color(0xFF647891)),
                           ),
                           const SizedBox(height: 20),
                           TextField(
@@ -396,7 +358,7 @@ class _OwnerAccessGateState extends State<OwnerAccessGate>
                             'Your password is saved securely in your database and encrypted on this device.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Color(0xFF68736D),
+                              color: Color(0xFF647891),
                               fontSize: 12,
                               height: 1.4,
                             ),
@@ -449,7 +411,7 @@ class _ShopDashboardState extends State<ShopDashboard> {
                     selectedIndex: _selectedIndex,
                     onDestinationSelected: _selectPage,
                     labelType: NavigationRailLabelType.all,
-                    backgroundColor: const Color(0xFFFFFEFA),
+                    backgroundColor: const Color(0xFFFFFFFF),
                     leading: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: _BrandMark(compact: true),
@@ -515,8 +477,8 @@ class _ShopDashboardState extends State<ShopDashboard> {
                       label: 'Products',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.point_of_sale_outlined),
-                      selectedIcon: Icon(Icons.point_of_sale_rounded),
+                      icon: _SalesNavigationIcon(),
+                      selectedIcon: _SalesNavigationIcon(),
                       label: 'Sales',
                     ),
                     NavigationDestination(
@@ -547,10 +509,10 @@ class _DeveloperCredit extends StatelessWidget {
     height: 34,
     width: double.infinity,
     decoration: BoxDecoration(
-      color: dark ? _navy : const Color(0xFFFFFEFA),
+      color: dark ? _navy : const Color(0xFFFFFFFF),
       border: Border(
         top: BorderSide(
-          color: dark ? const Color(0xFF40514A) : const Color(0xFFE3DED2),
+          color: dark ? const Color(0xFF275B96) : const Color(0xFFE4ECF5),
         ),
       ),
     ),
@@ -563,7 +525,7 @@ class _DeveloperCredit extends StatelessWidget {
         Text(
           '© Developed by Genesis Tech',
           style: TextStyle(
-            color: dark ? const Color(0xFFD7E1D9) : const Color(0xFF68736D),
+            color: dark ? const Color(0xFFDCEBFF) : const Color(0xFF647891),
             fontSize: 11,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.2,
@@ -669,12 +631,17 @@ class _OverviewScreenState extends State<_OverviewScreen> {
     });
     return Scaffold(
       appBar: AppBar(
-        title: const _BrandMark(),
+        backgroundColor: _blue,
+        toolbarHeight: 86,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        ),
+        title: const _BrandMark(onBlue: true),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 18),
             child: CircleAvatar(
-              backgroundColor: const Color(0xFFE7EEE8),
+              backgroundColor: const Color(0xFFE8F7EF),
               foregroundColor: _blue,
               child: Image.asset(
                 'assets/brand/nanakay_mark_dark.png',
@@ -701,14 +668,66 @@ class _OverviewScreenState extends State<_OverviewScreen> {
             'A clear view of your electrical shop.',
             style: Theme.of(
               context,
-            ).textTheme.bodyLarge?.copyWith(color: const Color(0xFF68736D)),
+            ).textTheme.bodyLarge?.copyWith(color: const Color(0xFF647891)),
           ),
           const SizedBox(height: 24),
+          Card(
+            color: _blue,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final stacked = constraints.maxWidth < 480;
+                  final copy = const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Keep your inventory up to date',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Add products, update prices and check stock levels.',
+                        style: TextStyle(color: Color(0xFFDCEBFF)),
+                      ),
+                    ],
+                  );
+                  final button = FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: _blue,
+                    ),
+                    onPressed: widget.onOpenProducts,
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: const Text('Open products'),
+                  );
+                  if (stacked) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [copy, const SizedBox(height: 16), button],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: copy),
+                      const SizedBox(width: 16),
+                      button,
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final columns = constraints.maxWidth > 850
                   ? 4
-                  : constraints.maxWidth > 500
+                  : constraints.maxWidth >= 300
                   ? 2
                   : 1;
               const gap = 14.0;
@@ -725,7 +744,7 @@ class _OverviewScreenState extends State<_OverviewScreen> {
                       value: _money(salesTotal),
                       helper: '${todaysSales.length} recorded sales today',
                       icon: Icons.payments_outlined,
-                      tint: Color(0xFFE7EEE8),
+                      tint: Color(0xFFE9F3FF),
                     ),
                   ),
                   SizedBox(
@@ -735,7 +754,7 @@ class _OverviewScreenState extends State<_OverviewScreen> {
                       value: _money(profit),
                       helper: 'Recorded where a sale has saved cost data',
                       icon: Icons.trending_up_rounded,
-                      tint: Color(0xFFE7EEE8),
+                      tint: Color(0xFFE8F7EF),
                     ),
                   ),
                   SizedBox(
@@ -817,68 +836,6 @@ class _OverviewScreenState extends State<_OverviewScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 28),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Get started',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: _navy,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final stacked = constraints.maxWidth < 480;
-                  final copy = const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Keep your inventory up to date',
-                        style: TextStyle(
-                          color: _navy,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        'Add products, update prices and check stock levels.',
-                        style: TextStyle(color: Color(0xFF68736D)),
-                      ),
-                    ],
-                  );
-                  final button = FilledButton.icon(
-                    onPressed: widget.onOpenProducts,
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text('Open products'),
-                  );
-                  if (stacked) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [copy, const SizedBox(height: 16), button],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      Expanded(child: copy),
-                      const SizedBox(width: 16),
-                      button,
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           const _InfoNote(
             icon: Icons.info_outline_rounded,
             text:
@@ -891,56 +848,58 @@ class _OverviewScreenState extends State<_OverviewScreen> {
 }
 
 class _BrandMark extends StatelessWidget {
-  const _BrandMark({this.compact = false});
-
+  const _BrandMark({this.compact = false, this.onBlue = false});
   final bool compact;
-
+  final bool onBlue;
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: _navy,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Image.asset('assets/brand/nanakay_mark_light.png'),
-          ),
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+    children: [
+      Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: onBlue ? Colors.white.withValues(alpha: .2) : _blue,
+          borderRadius: BorderRadius.circular(14),
         ),
-        if (!compact) ...[
-          const SizedBox(width: 11),
-          const Column(
+        padding: const EdgeInsets.all(8),
+        child: Image.asset('assets/brand/nanakay_mark_light.png'),
+      ),
+      if (!compact) ...[
+        const SizedBox(width: 12),
+        Flexible(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'NanaKay Electrical Shop',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: _navy,
-                  fontSize: 15,
+                  color: onBlue ? Colors.white : _navy,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              const SizedBox(height: 4),
               Text(
                 'ELECTRICAL SHOP',
                 style: TextStyle(
-                  color: Color(0xFF727C73),
+                  color: onBlue
+                      ? const Color(0xFFDCEBFF)
+                      : const Color(0xFF718299),
                   fontSize: 10,
                   letterSpacing: 1.5,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ],
-    );
-  }
+    ],
+  );
 }
 
 class _MetricCard extends StatelessWidget {
@@ -960,47 +919,82 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = tint == const Color(0xFFFFEAEA)
+        ? const Color(0xFFDC454B)
+        : tint == const Color(0xFFFFF3DF)
+        ? const Color(0xFFE1A400)
+        : tint == const Color(0xFFE8F7EF)
+        ? const Color(0xFF08A26D)
+        : _blue;
     return Card(
+      color: tint,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      color: Color(0xFF68736D),
-                      fontWeight: FontWeight.w600,
-                    ),
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: .15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: tint,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Icon(icon, size: 19, color: _navy),
-                ),
-              ],
+                ],
+              ),
+              child: Icon(icon, size: 24, color: Colors.white),
             ),
-            const SizedBox(height: 16),
-            Text(
-              value,
-              style: const TextStyle(
-                color: _navy,
-                fontSize: 25,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: Center(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _navy,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 5),
-            Text(
-              helper,
-              style: const TextStyle(color: Color(0xFF80887F), fontSize: 12),
+            SizedBox(
+              height: 32,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    color: _navy,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              height: 30,
+              child: Text(
+                helper,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF647891),
+                  fontSize: 11,
+                  height: 1.3,
+                ),
+              ),
             ),
           ],
         ),
@@ -1023,16 +1017,41 @@ class _InfoNote extends StatelessWidget {
         const Icon(
           Icons.info_outline_rounded,
           size: 17,
-          color: Color(0xFF68736D),
+          color: Color(0xFF647891),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(color: Color(0xFF68736D), fontSize: 12),
+            style: const TextStyle(color: Color(0xFF647891), fontSize: 12),
           ),
         ),
       ],
     );
   }
+}
+
+class _SalesNavigationIcon extends StatelessWidget {
+  const _SalesNavigationIcon();
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 44,
+    height: 44,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: _blue,
+      boxShadow: [
+        BoxShadow(
+          color: _blue.withValues(alpha: .23),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    ),
+    child: const Icon(
+      Icons.point_of_sale_rounded,
+      color: Colors.white,
+      size: 23,
+    ),
+  );
 }

@@ -7,9 +7,9 @@ import '../services/shop_sync_service.dart';
 import '../services/app_control_service.dart';
 import 'owner_control_screen.dart';
 
-const _ink = Color(0xFF24352F);
-const _pine = Color(0xFF3D6555);
-const _muted = Color(0xFF68736D);
+const _ink = Color(0xFF142B49);
+const _pine = Color(0xFF0879E8);
+const _muted = Color(0xFF647891);
 
 class CloudSyncScreen extends StatefulWidget {
   const CloudSyncScreen({super.key});
@@ -224,7 +224,7 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFE7EEE8),
+              color: const Color(0xFFE8F7EF),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.cloud_sync_outlined, color: _pine),
@@ -420,7 +420,7 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
   );
 
   Widget _messageCard() => Card(
-    color: _messageIsError ? const Color(0xFFFFF3EF) : const Color(0xFFE7EEE8),
+    color: _messageIsError ? const Color(0xFFFFF3EF) : const Color(0xFFE8F7EF),
     child: Padding(
       padding: const EdgeInsets.all(14),
       child: Text(

@@ -3,9 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_control_service.dart';
 
-const _ink = Color(0xFF24352F);
-const _pine = Color(0xFF3D6555);
-const _muted = Color(0xFF68736D);
+const _ink = Color(0xFF142B49);
+const _pine = Color(0xFF0879E8);
+const _muted = Color(0xFF647891);
 
 class OwnerControlScreen extends StatefulWidget {
   const OwnerControlScreen({super.key});
@@ -378,7 +378,7 @@ class _OwnerControlScreenState extends State<OwnerControlScreen> {
   );
 
   Widget _messageCard(String message, {bool error = false}) => Card(
-    color: error ? const Color(0xFFFFF3EF) : const Color(0xFFE7EEE8),
+    color: error ? const Color(0xFFFFF3EF) : const Color(0xFFE8F7EF),
     child: Padding(
       padding: const EdgeInsets.all(14),
       child: Text(

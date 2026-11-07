@@ -14,7 +14,7 @@ class PurchaseHistoryDialog extends StatelessWidget {
     return AlertDialog(
       title: const Row(
         children: [
-          Icon(Icons.local_shipping_outlined, color: Color(0xFF3D6555)),
+          Icon(Icons.local_shipping_outlined, color: Color(0xFF0879E8)),
           SizedBox(width: 10),
           Expanded(child: Text('Stock purchase history')),
         ],
@@ -76,7 +76,7 @@ class PurchaseHistoryDialog extends StatelessWidget {
                         padding: const EdgeInsets.all(12),
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE7EEE8),
+                          color: const Color(0xFFE8F7EF),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -84,7 +84,7 @@ class PurchaseHistoryDialog extends StatelessWidget {
                           textAlign: TextAlign.right,
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF24352F),
+                            color: Color(0xFF142B49),
                           ),
                         ),
                       ),

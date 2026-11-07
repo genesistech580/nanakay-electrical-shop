@@ -105,7 +105,7 @@ class _StockPurchaseDialogState extends State<StockPurchaseDialog> {
             children: [
               const Text(
                 'Record all the goods in one delivery. Inventory increases together; this purchase does not reduce estimated profit.',
-                style: TextStyle(color: Color(0xFF68736D), height: 1.5),
+                style: TextStyle(color: Color(0xFF647891), height: 1.5),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -159,7 +159,7 @@ class _StockPurchaseDialogState extends State<StockPurchaseDialog> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE7EEE8),
+                  color: const Color(0xFFE8F7EF),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -167,7 +167,7 @@ class _StockPurchaseDialogState extends State<StockPurchaseDialog> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF24352F),
+                    color: Color(0xFF142B49),
                   ),
                 ),
               ),

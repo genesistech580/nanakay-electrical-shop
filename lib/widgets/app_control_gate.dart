@@ -7,8 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_control_service.dart';
 
-const _controlInk = Color(0xFF24352F);
-const _controlGreen = Color(0xFF3D6555);
+const _controlInk = Color(0xFF142B49);
+const _controlGreen = Color(0xFF0879E8);
 
 class AppControlGate extends StatefulWidget {
   const AppControlGate({super.key, required this.child});

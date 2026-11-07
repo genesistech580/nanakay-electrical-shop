@@ -15,8 +15,8 @@ import 'products_screen.dart';
 
 const _productsKey = 'electrical_shop_products_v1';
 const _salesKey = 'electrical_shop_sales_v1';
-const _navy = Color(0xFF24352F);
-const _blue = Color(0xFF3D6555);
+const _navy = Color(0xFF142B49);
+const _blue = Color(0xFF0879E8);
 
 enum SalePayment { cash, momo, credit }
 
@@ -187,7 +187,7 @@ class _SalesScreenState extends State<SalesScreen> {
                 fontSize: 13,
                 letterSpacing: 1.2,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF3D6555),
+                color: Color(0xFF0879E8),
               ),
             ),
             SizedBox(height: 4),
@@ -202,7 +202,7 @@ class _SalesScreenState extends State<SalesScreen> {
             children: [
               Text(
                 'Receipt #${_saleId(sale)}',
-                style: const TextStyle(color: Color(0xFF68736D)),
+                style: const TextStyle(color: Color(0xFF647891)),
               ),
               const SizedBox(height: 12),
               ...(sale['items'] as List<dynamic>).map((raw) {
@@ -478,7 +478,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                 Text(
                                   'Choose products and confirm payment',
                                   style: TextStyle(
-                                    color: Color(0xFFD7E1D9),
+                                    color: Color(0xFFDCEBFF),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -515,7 +515,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                 return Card(
                                   child: ListTile(
                                     leading: const CircleAvatar(
-                                      backgroundColor: Color(0xFFE7EEE8),
+                                      backgroundColor: Color(0xFFE8F7EF),
                                       child: Icon(
                                         Icons.electrical_services,
                                         color: _blue,
@@ -612,7 +612,7 @@ class _SalesScreenState extends State<SalesScreen> {
         return Card(
           child: ExpansionTile(
             leading: const CircleAvatar(
-              backgroundColor: Color(0xFFE7EEE8),
+              backgroundColor: Color(0xFFE8F7EF),
               child: Icon(Icons.receipt_long_outlined, color: _blue),
             ),
             title: Text(
@@ -692,7 +692,7 @@ class _SalesScreenState extends State<SalesScreen> {
                       ),
                       Text(
                         '${line.quantity} × ${_money(line.product.sellingPrice)}',
-                        style: const TextStyle(color: Color(0xFF68736D)),
+                        style: const TextStyle(color: Color(0xFF647891)),
                       ),
                     ],
                   ),
@@ -763,7 +763,7 @@ class _SalesScreenState extends State<SalesScreen> {
         ),
         Text(
           '${_cart.length} items',
-          style: const TextStyle(color: Color(0xFF68736D)),
+          style: const TextStyle(color: Color(0xFF647891)),
         ),
       ],
     );
@@ -773,7 +773,7 @@ class _SalesScreenState extends State<SalesScreen> {
             child: Center(
               child: Text(
                 'Add products to start an order.',
-                style: TextStyle(color: Color(0xFF68736D)),
+                style: TextStyle(color: Color(0xFF647891)),
               ),
             ),
           )
@@ -851,7 +851,7 @@ class _SalesScreenState extends State<SalesScreen> {
           padding: EdgeInsets.only(top: 8),
           child: Text(
             'MoMo is recorded as the payment method. No payment is initiated.',
-            style: TextStyle(fontSize: 11, color: Color(0xFF68736D)),
+            style: TextStyle(fontSize: 11, color: Color(0xFF647891)),
           ),
         ),
     ];

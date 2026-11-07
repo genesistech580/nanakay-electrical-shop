@@ -17,8 +17,8 @@ const _expensesKey = 'electrical_shop_expenses_v1';
 const _repaymentsKey = 'electrical_shop_repayments_v1';
 const _receiptsKey = 'electrical_shop_stock_receipts_v1';
 const _productsKey = 'electrical_shop_products_v1';
-const _ink = Color(0xFF24352F);
-const _blue = Color(0xFF3D6555);
+const _ink = Color(0xFF142B49);
+const _blue = Color(0xFF0879E8);
 
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen({super.key});
@@ -192,7 +192,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             children: [
               Text(
                 'Maximum: ${_money(maximum)}',
-                style: const TextStyle(color: Color(0xFF68736D)),
+                style: const TextStyle(color: Color(0xFF647891)),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -817,7 +817,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             final customer = Row(
               children: [
                 const CircleAvatar(
-                  backgroundColor: Color(0xFFE7EEE8),
+                  backgroundColor: Color(0xFFE8F7EF),
                   child: Icon(Icons.person_outline, color: _blue),
                 ),
                 const SizedBox(width: 12),
@@ -942,7 +942,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       const SizedBox(height: 4),
       const Text(
         'All recorded sales and expenses',
-        style: TextStyle(color: Color(0xFF68736D)),
+        style: TextStyle(color: Color(0xFF647891)),
       ),
       const SizedBox(height: 14),
       const Text(
@@ -989,7 +989,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             _money(_revenue),
             'All sales, including credit',
             Icons.trending_up,
-            const Color(0xFFE7EEE8),
+            const Color(0xFFE8F7EF),
           ),
           _metric(
             'Cost of goods',
@@ -1010,7 +1010,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             _money(_netProfit),
             'Costed sales less operating expenses',
             Icons.savings_outlined,
-            const Color(0xFFE7EEE8),
+            const Color(0xFFE8F7EF),
           ),
         ],
       ),
@@ -1088,7 +1088,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       const SizedBox(height: 12),
       const Text(
         'Estimated profit is sales margin less operating expenses. Stock purchases do not reduce profit when recorded; their cost is counted when the goods are sold. Older sales without saved costs are omitted.',
-        style: TextStyle(color: Color(0xFF68736D), fontSize: 12, height: 1.4),
+        style: TextStyle(color: Color(0xFF647891), fontSize: 12, height: 1.4),
       ),
     ],
   );
@@ -1277,7 +1277,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 ),
                 Text(
                   '${totals['salesCount']} sales',
-                  style: const TextStyle(color: Color(0xFF68736D)),
+                  style: const TextStyle(color: Color(0xFF647891)),
                 ),
               ],
             ),
@@ -1315,7 +1315,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: emphasize ? _ink : const Color(0xFF68736D),
+                  color: emphasize ? _ink : const Color(0xFF647891),
                   fontWeight: emphasize ? FontWeight.w800 : FontWeight.normal,
                 ),
               ),
@@ -1355,7 +1355,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Color(0xFF68736D))),
+                Text(title, style: const TextStyle(color: Color(0xFF647891))),
                 const SizedBox(height: 4),
                 Text(
                   amount,
@@ -1369,7 +1369,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   helper,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF68736D),
+                    color: Color(0xFF647891),
                   ),
                 ),
               ],

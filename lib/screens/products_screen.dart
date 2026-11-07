@@ -515,7 +515,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           'Products',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: const Color(0xFFFFFEFA),
+        backgroundColor: const Color(0xFFFFFFFF),
         actions: [
           if (_isSaving)
             const Padding(
@@ -542,7 +542,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               icon: const Icon(Icons.add_shopping_cart, size: 18),
               label: const Text('New purchase'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF3D6555),
+                backgroundColor: const Color(0xFF0879E8),
                 foregroundColor: Colors.white,
               ),
             ),
@@ -628,7 +628,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 filled: true,
-                                fillColor: const Color(0xFFFFFEFA),
+                                fillColor: const Color(0xFFFFFFFF),
                               ),
                               onChanged: (value) {
                                 setState(() => _search = value);
@@ -656,7 +656,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                         const Icon(
                                           Icons.inventory_2_outlined,
                                           size: 48,
-                                          color: Color(0xFF68736D),
+                                          color: Color(0xFF647891),
                                         ),
                                         const SizedBox(height: 10),
                                         Text(
@@ -705,13 +705,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           Container(
                                             padding: const EdgeInsets.all(10),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFE7EEE8),
+                                              color: const Color(0xFFE8F7EF),
                                               borderRadius:
                                                   BorderRadius.circular(12),
                                             ),
                                             child: const Icon(
                                               Icons.electrical_services,
-                                              color: Color(0xFF3D6555),
+                                              color: Color(0xFF0879E8),
                                             ),
                                           ),
                                           const SizedBox(width: 12),
@@ -825,22 +825,28 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Widget _statCard(String title, String value, IconData icon) {
-    return Card(
-      color: const Color(0xFFFFFEFA),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: const Color(0xFF3D6555)),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
-            ),
-            Text(title, style: const TextStyle(fontSize: 12)),
-          ],
+    return SizedBox(
+      width: double.infinity,
+      child: Card(
+        color: const Color(0xFFFFFFFF),
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: const Color(0xFF0879E8)),
+              const SizedBox(height: 10),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(title, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
         ),
       ),
     );
