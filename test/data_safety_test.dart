@@ -57,6 +57,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('GHS 95.00'), findsWidgets);
     expect(find.text('GHS 133.00'), findsWidgets);
+    await prefs.setString(
+      'electrical_shop_expenses_v1',
+      jsonEncode([
+        {
+          'id': 'e1',
+          'title': 'Transport',
+          'category': 'Transport',
+          'amount': 10,
+        },
+        {
+          'id': 'e2',
+          'title': 'Delivery',
+          'category': 'Stock Purchase',
+          'amount': 20,
+        },
+      ]),
+    );
+    await tester.pumpWidget(const MaterialApp(home: FinanceScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Expenses & profit'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Shop main capital'), 300);
+    expect(find.text('GHS 218.00'), findsOneWidget);
   });
   testWidgets('Inventory actions fit a narrow phone screen', (tester) async {
     tester.view.physicalSize = const Size(320, 640);

@@ -33,6 +33,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
   List<Map<String, dynamic>> _repayments = [];
   bool _loading = true;
   double _stockCostValue = 0;
+  double _stockSellingValue = 0;
   bool _busy = false;
   int _tab = 0;
 
@@ -61,19 +62,25 @@ class _FinanceScreenState extends State<FinanceScreen> {
       final sales = _decodeList(prefs.getString(_salesKey));
       final expenses = _decodeList(prefs.getString(_expensesKey));
       final repayments = _decodeList(prefs.getString(_repaymentsKey));
-      final stockCostValue = _decodeList(prefs.getString(_productsKey))
-          .fold<double>(
-            0,
-            (total, product) =>
-                total +
-                _value(product, 'costPrice') * _value(product, 'quantity'),
-          );
+      final products = _decodeList(prefs.getString(_productsKey));
+      final stockSellingValue = products.fold<double>(
+        0,
+        (total, product) =>
+            total +
+            _value(product, 'sellingPrice') * _value(product, 'quantity'),
+      );
+      final stockCostValue = products.fold<double>(
+        0,
+        (total, product) =>
+            total + _value(product, 'costPrice') * _value(product, 'quantity'),
+      );
       if (mounted) {
         setState(() {
           _sales = sales;
           _expenses = expenses;
           _repayments = repayments;
           _stockCostValue = stockCostValue;
+          _stockSellingValue = stockSellingValue;
           _loading = false;
         });
       }
@@ -1026,6 +1033,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
             _money(_stockCostValue),
             'Cost of goods still in stock',
             Icons.inventory_outlined,
+            const Color(0xFFE9F3FF),
+          ),
+          _metric(
+            'Shop main capital',
+            _money(_stockSellingValue - _operatingExpenseTotal),
+            'Remaining stock at selling prices, less operating expenses',
+            Icons.account_balance_wallet_outlined,
             const Color(0xFFE9F3FF),
           ),
         ],
