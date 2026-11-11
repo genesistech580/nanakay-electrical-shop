@@ -21,6 +21,40 @@ Map<String, dynamic> backup() => {
 };
 
 void main() {
+  testWidgets('Shop reset clears transactions and keeps inventory', (
+    tester,
+  ) async {
+    const products = 'electrical_shop_products_v1';
+    const purchases = 'electrical_shop_stock_receipts_v1';
+    const transactions = [
+      'electrical_shop_sales_v1',
+      'electrical_shop_expenses_v1',
+      'electrical_shop_repayments_v1',
+    ];
+    const inventory =
+        '[{"id":"p1","quantity":12,"costPrice":5,"sellingPrice":8}]';
+    const records = '[{"id":"r1","total":10,"amount":10}]';
+    SharedPreferences.setMockInitialValues({
+      products: inventory,
+      purchases: records,
+      for (final key in transactions) key: records,
+    });
+    await tester.pumpWidget(const MaterialApp(home: FinanceScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Data backup'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reset shop transactions'));
+    await tester.pumpAndSettle();
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(transactions.first), records);
+    await tester.tap(find.text('Clear transactions'));
+    await tester.pumpAndSettle();
+    for (final key in transactions) {
+      expect(prefs.getString(key), '[]');
+    }
+    expect(prefs.getString(products), inventory);
+    expect(prefs.getString(purchases), records);
+  });
   testWidgets('A sale reduces remaining stock value and preserves history', (
     tester,
   ) async {

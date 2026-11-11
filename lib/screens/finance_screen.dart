@@ -554,6 +554,62 @@ class _FinanceScreenState extends State<FinanceScreen> {
     }
   }
 
+  Future<void> _resetShopTransactions() async {
+    if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset shop transactions?'),
+        content: const Text(
+          'This clears sales history and receipts, customer credit, repayments, '
+          'and expenses. Products, prices, stock quantities, and purchase history '
+          'will be kept. Cloud sync can carry these deletions to other devices. '
+          'To keep a copy of your records, cancel and choose Create backup first.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear transactions'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await saveShopRecords(prefs, {
+        _salesKey: '[]',
+        _expensesKey: '[]',
+        _repaymentsKey: '[]',
+      });
+      productStockChanged.value++;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Shop transactions cleared.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message
+                  : 'Could not clear shop transactions.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _exportBackup() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -716,8 +772,17 @@ class _FinanceScreenState extends State<FinanceScreen> {
           actions: [
             PopupMenuButton<String>(
               tooltip: 'Data backup',
-              onSelected: (value) =>
-                  value == 'export' ? _exportBackup() : _restoreBackup(),
+              enabled: !_busy,
+              onSelected: (value) {
+                switch (value) {
+                  case 'export':
+                    _exportBackup();
+                  case 'restore':
+                    _restoreBackup();
+                  case 'reset':
+                    _resetShopTransactions();
+                }
+              },
               itemBuilder: (context) => const [
                 PopupMenuItem(
                   value: 'export',
@@ -731,6 +796,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   child: ListTile(
                     leading: Icon(Icons.restore_outlined),
                     title: Text('Restore backup'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'reset',
+                  child: ListTile(
+                    leading: Icon(Icons.restart_alt),
+                    title: Text('Reset shop transactions'),
                   ),
                 ),
               ],
