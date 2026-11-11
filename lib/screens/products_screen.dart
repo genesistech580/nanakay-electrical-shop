@@ -504,6 +504,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Widget build(BuildContext context) {
     final products = _filteredProducts;
     final lowStockCount = _products.where((p) => p.isLowStock).length;
+    final stockCostValue = _products.fold<double>(
+      0,
+      (total, product) => total + product.costPrice * product.quantity,
+    );
     final expectedStockProfit = _products.fold<double>(
       0,
       (sum, product) => sum + product.profitPerItem * product.quantity,
@@ -612,6 +616,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 12),
+                            _statCard(
+                              'Current stock value at cost',
+                              money(stockCostValue),
+                              Icons.account_balance_wallet_outlined,
                             ),
                             const SizedBox(height: 12),
                             _statCard(
