@@ -21,6 +21,43 @@ Map<String, dynamic> backup() => {
 };
 
 void main() {
+  testWidgets('A sale reduces remaining stock value and preserves history', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({
+      'electrical_shop_products_v1': jsonEncode([
+        {
+          'id': 'p1',
+          'name': 'Cable',
+          'category': 'Wiring',
+          'costPrice': 5,
+          'sellingPrice': 12,
+          'quantity': 20,
+          'lowStockLimit': 2,
+        },
+      ]),
+    });
+    await tester.pumpWidget(const MaterialApp(home: SalesScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Add Cable'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm sale'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    final prefs = await SharedPreferences.getInstance();
+    final sales =
+        jsonDecode(prefs.getString('electrical_shop_sales_v1')!) as List;
+    expect(sales.single['total'], 12);
+    expect(sales.single['items'].single['unitCost'], 5);
+    await tester.pumpWidget(const MaterialApp(home: ProductsScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('GHS 95.00'), findsWidgets);
+    expect(find.text('GHS 133.00'), findsWidgets);
+  });
   testWidgets('Inventory actions fit a narrow phone screen', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
