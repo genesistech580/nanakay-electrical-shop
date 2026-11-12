@@ -1020,101 +1020,76 @@ class _FinanceScreenState extends State<FinanceScreen> {
     padding: const EdgeInsets.fromLTRB(18, 6, 18, 24),
     children: [
       const Text(
-        'Shop performance',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-          color: _ink,
-        ),
-      ),
-      const SizedBox(height: 4),
-      const Text(
-        'All recorded sales and expenses',
-        style: TextStyle(color: Color(0xFF647891)),
-      ),
-      const SizedBox(height: 14),
-      const Text(
-        'Daily, weekly & monthly',
+        'All-time sales and profit',
         style: TextStyle(
           fontSize: 17,
           fontWeight: FontWeight.w800,
           color: _ink,
         ),
       ),
-      const SizedBox(height: 8),
-      _periodCard(
-        'Today',
-        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _periodRow('Sales revenue', _revenue),
+              _periodRow('Cost of items sold', _costOfGoods),
+              _periodRow('Operating expenses', _operatingExpenseTotal),
+              const Divider(),
+              _periodRow('Estimated net profit', _netProfit, emphasize: true),
+              if (_salesWithCostSnapshots.length != _sales.length)
+                const Text(
+                  'Sales without saved costs are excluded from the profit estimate.',
+                ),
+            ],
+          ),
+        ),
       ),
-      _periodCard(
-        'This week',
-        DateTime(
-          DateTime.now().year,
-          DateTime.now().month,
-          DateTime.now().day,
-        ).subtract(Duration(days: DateTime.now().weekday - 1)),
-      ),
-      _periodCard(
-        'This month',
-        DateTime(DateTime.now().year, DateTime.now().month),
-      ),
-      const SizedBox(height: 18),
+      const SizedBox(height: 16),
       const Text(
-        'All-time totals',
+        'Stock on hand',
         style: TextStyle(
           fontSize: 17,
           fontWeight: FontWeight.w800,
           color: _ink,
         ),
       ),
-      const SizedBox(height: 8),
-      Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          _metric(
-            'Sales revenue',
-            _money(_revenue),
-            'All sales, including credit',
-            Icons.trending_up,
-            const Color(0xFFE8F7EF),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _periodRow('Current stock value at cost', _stockCostValue),
+              _periodRow(
+                'Shop main capital',
+                _stockSellingValue - _operatingExpenseTotal,
+              ),
+              const Text(
+                'Main capital is the selling value of remaining stock minus operating expenses.',
+              ),
+            ],
           ),
-          _metric(
-            'Cost of goods',
-            _money(_costOfGoods),
-            'Sales with saved cost prices',
-            Icons.inventory_2_outlined,
-            const Color(0xFFFFF3DF),
-          ),
-          _metric(
-            'Expenses',
-            _money(_expenseTotal),
-            'All recorded expenses',
-            Icons.receipt_long_outlined,
-            const Color(0xFFFFEAEA),
-          ),
-          _metric(
-            'Estimated net profit',
-            _money(_netProfit),
-            'Costed sales less operating expenses',
-            Icons.savings_outlined,
-            const Color(0xFFE8F7EF),
-          ),
-          _metric(
-            'Current stock value at cost',
-            _money(_stockCostValue),
-            'Cost of goods still in stock',
-            Icons.inventory_outlined,
-            const Color(0xFFE9F3FF),
-          ),
-          _metric(
-            'Shop main capital',
-            _money(_stockSellingValue - _operatingExpenseTotal),
-            'Remaining stock at selling prices, less operating expenses',
-            Icons.account_balance_wallet_outlined,
-            const Color(0xFFE9F3FF),
-          ),
-        ],
+        ),
+      ),
+      Card(
+        child: ExpansionTile(
+          title: const Text('Daily, weekly and monthly reports'),
+          children: [
+            _periodCard('Today', DateUtils.dateOnly(DateTime.now())),
+            _periodCard(
+              'This week',
+              DateUtils.dateOnly(
+                DateTime.now(),
+              ).subtract(Duration(days: DateTime.now().weekday - 1)),
+            ),
+            _periodCard(
+              'This month',
+              DateTime(DateTime.now().year, DateTime.now().month),
+            ),
+          ],
+        ),
       ),
       const SizedBox(height: 20),
       Row(
@@ -1137,6 +1112,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
         ],
       ),
       const SizedBox(height: 8),
+      _periodRow('Total recorded expenses', _expenseTotal),
       if (_expenses.isEmpty)
         const Card(
           child: Padding(
@@ -1188,10 +1164,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
         ),
       ),
       const SizedBox(height: 12),
-      const Text(
-        'Estimated profit is sales margin less operating expenses. Stock purchases do not reduce profit when recorded; their cost is counted when the goods are sold. Older sales without saved costs are omitted.',
-        style: TextStyle(color: Color(0xFF647891), fontSize: 12, height: 1.4),
-      ),
     ],
   );
 
@@ -1480,17 +1452,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
         ],
       ),
     ),
-  );
-
-  Widget _metric(
-    String title,
-    String amount,
-    String helper,
-    IconData icon,
-    Color tint,
-  ) => SizedBox(
-    width: 230,
-    child: _summaryCard(title, amount, helper, icon, tint),
   );
 
   String _date(dynamic value) {
